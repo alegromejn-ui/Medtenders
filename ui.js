@@ -76,14 +76,14 @@
     h += '</fieldset>';
     h += '<fieldset><legend>Статус</legend><div class="pills"><button data-act="status" data-v="" aria-pressed="' + (!f.status) + '">Усі</button>' +
       F.GROUPS.map(function (g) { return '<button data-act="status" data-v="' + g.id + '" aria-pressed="' + (f.status === g.id) + '">' + g.name + ' <b>' + (fc.status[g.id] || 0) + '</b></button>'; }).join('') + '</div></fieldset>';
-    var regs = Object.keys(fc.region).sort(function (a, b) { return a.localeCompare(b, 'uk'); });
+    var regs = F.regionList(fc.region);
     if (f.region && regs.indexOf(f.region) < 0) regs.unshift(f.region);
     h += '<label class="fl" for="' + pre + '-region">Регіон замовника</label><select id="' + pre + '-region" data-change="region"><option value="">Уся Україна</option>' +
-      regs.map(function (r) { return '<option value="' + esc(r) + '"' + (f.region === r ? ' selected' : '') + '>' + esc(r) + ' (' + (fc.region[r] || 0) + ')</option>'; }).join('') + '</select>';
-    var types = Object.keys(fc.type).sort(function (a, b) { return (fc.type[b] - fc.type[a]) || F.typeName(a).localeCompare(F.typeName(b), 'uk'); });
+      regs.map(function (r) { return '<option value="' + esc(r) + '"' + (f.region === r ? ' selected' : '') + '>' + esc(r) + (fc.region[r] ? ' (' + fc.region[r] + ')' : '') + '</option>'; }).join('') + '</select>';
+    var types = F.typeList(fc.type);
     if (f.type && types.indexOf(f.type) < 0) types.unshift(f.type);
     h += '<label class="fl" for="' + pre + '-type">Вид закупівлі</label><select id="' + pre + '-type" data-change="type"><option value="">Усі види</option>' +
-      types.map(function (t) { return '<option value="' + esc(t) + '"' + (f.type === t ? ' selected' : '') + '>' + esc(F.typeName(t)) + ' (' + (fc.type[t] || 0) + ')</option>'; }).join('') + '</select>';
+      types.map(function (t) { return '<option value="' + esc(t) + '"' + (f.type === t ? ' selected' : '') + '>' + esc(F.typeName(t)) + (fc.type[t] ? ' (' + fc.type[t] + ')' : '') + '</option>'; }).join('') + '</select>';
     if (F.activeCount()) h += '<button class="btn ghost sm reset" data-act="reset">Скинути фільтри</button>';
     return h + '</div>';
   }

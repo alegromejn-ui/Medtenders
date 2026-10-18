@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v1';
+  var VERSION = 'v2';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -92,12 +92,27 @@
     simple: 'Закупівля без системи', 'aboveThresholdUA.defense': 'Оборонні торги', 'simple.defense': 'Оборонна спрощена'
   };
   function typeName(p) { return TYPES[p] || p || 'Інший вид'; }
+  var REGIONS = ['м. Київ', 'Вінницька обл.', 'Волинська обл.', 'Дніпропетровська обл.', 'Донецька обл.', 'Житомирська обл.', 'Закарпатська обл.',
+    'Запорізька обл.', 'Івано-Франківська обл.', 'Київська обл.', 'Кіровоградська обл.', 'Луганська обл.', 'Львівська обл.', 'Миколаївська обл.',
+    'Одеська обл.', 'Полтавська обл.', 'Рівненська обл.', 'Сумська обл.', 'Тернопільська обл.', 'Харківська обл.', 'Херсонська обл.',
+    'Хмельницька обл.', 'Черкаська обл.', 'Чернівецька обл.', 'Чернігівська обл.', 'АР Крим', 'м. Севастополь'];
+  // Порядок видів у фільтрі: спершу найпоширеніші
+  var TYPE_ORDER = ['aboveThreshold', 'belowThreshold', 'priceQuotation', 'reporting', 'negotiation', 'negotiation.quick', 'aboveThresholdUA', 'aboveThresholdEU',
+    'competitiveOrdering', 'requestForProposal', 'closeFrameworkAgreementUA', 'closeFrameworkAgreementSelectionUA', 'competitiveDialogueUA', 'competitiveDialogueEU',
+    'competitiveDialogueUA.stage2', 'competitiveDialogueEU.stage2', 'aboveThresholdUA.defense', 'simple.defense', 'esco'];
   function regionName(r) {
-    r = String(r || '').trim(); if (!r) return 'Регіон не вказано';
-    var m = /^(.+?)\s+(область|обл\.?)$/i.exec(r); if (m) return m[1] + ' обл.';
+    r = String(r || '').trim().replace(/\s+/g, ' '); if (!r) return 'Регіон не вказано';
     if (/^(м\.?\s*)?київ$/i.test(r)) return 'м. Київ';
-    return r;
+    if (/^(м\.?\s*)?севастополь$/i.test(r)) return 'м. Севастополь';
+    if (/крим/i.test(r)) return 'АР Крим';
+    var m = /^(.+?)\s+(область|обл\.?)$/i.exec(r); if (m) r = m[1];
+    var low = r.toLowerCase();
+    for (var i = 0; i < REGIONS.length; i++) if (REGIONS[i].toLowerCase().indexOf(low + ' ') === 0) return REGIONS[i];
+    return m ? m[1] + ' обл.' : r;
   }
+  // Повні списки для фільтрів: усі регіони й види, навіть якщо тендерів з ними ще немає
+  function regionList(extra) { var out = REGIONS.slice(); Object.keys(extra || {}).forEach(function (r) { if (out.indexOf(r) < 0) out.push(r); }); return out; }
+  function typeList(extra) { var out = TYPE_ORDER.slice(); Object.keys(extra || {}).forEach(function (t) { if (t && out.indexOf(t) < 0) out.push(t); }); return out; }
 
   // ---------- Стан ----------
   var DEF_F = { cats: [], period: '30', from: '', to: '', region: '', type: '', status: '', sort: 'new', q: '' };
@@ -316,7 +331,7 @@
     fetch: function (u, o) { return root.fetch(u, o); },
     get S() { return S; }, all: function () { return ALL; }, byId: function (id) { return BY[id]; },
     init: init, save: save, sync: sync, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
-    catsOfItem: catsOfItem, info: info, statusName: statusName, statusGroup: statusGroup, typeName: typeName, regionName: regionName,
+    catsOfItem: catsOfItem, info: info, statusName: statusName, statusGroup: statusGroup, typeName: typeName, regionName: regionName, regionList: regionList, typeList: typeList,
     query: query, facets: facets, setF: setF, resetF: resetF, activeCount: activeCount, periodRange: periodRange,
     toggleStar: toggleStar, isNew: isNew, deadline: deadline, prozorroUrl: prozorroUrl,
     fmtDate: fmtDate, fmtMoney: fmtMoney, fmtQty: fmtQty, plural: plural, pubMs: pubMs, norm: norm
