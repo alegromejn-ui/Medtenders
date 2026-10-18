@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v7';
+  var VERSION = 'v8';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -50,13 +50,17 @@
   }
 
   // Розбір тендеру (кешується, бо фільтри перераховуються часто)
+  // Товари, які не цікавлять: позиції з ними не рахуються, а тендер лише з ними прихований
+  var EXCL_ITEM = /рукавич|рукавиц|перчат|маск[аиоу]?([^а-яіїєґ]|$)|маски|масок|відріз\S*\s+марл|отрез\S*\s+марл|бахіл|бахил/;
   function info(t) {
     if (t._i && t._i.mod === t.mod) return t._i;
     var cats = {}, items = (t.items || []).map(function (it) {
+      if (EXCL_ITEM.test(norm(it.d))) return { it: it, cats: [], excl: true };
       var cs = catsOfItem(it); cs.forEach(function (c) { cats[c] = (cats[c] || 0) + 1; }); return { it: it, cats: cs };
     });
+    var allExcl = items.length > 0 && items.every(function (x) { return x.excl; });
     var hay = norm([t.t, t.org, t.edr, t.tid, t.loc, t.reg].concat((t.items || []).map(function (i) { return i.d; })).join(' | '));
-    var i = { mod: t.mod, cats: cats, catList: Object.keys(cats), items: items, matched: items.filter(function (x) { return x.cats.length; }).length, hay: hay, region: regionName(t.reg), group: statusGroup(t.st) };
+    var i = { mod: t.mod, cats: cats, catList: Object.keys(cats), items: items, matched: items.filter(function (x) { return x.cats.length; }).length, hay: hay, region: regionName(t.reg), group: statusGroup(t.st), allExcl: allExcl };
     try { Object.defineProperty(t, '_i', { value: i, enumerable: false, configurable: true, writable: true }); } catch (e) { /* ignore */ }
     return i;
   }
@@ -254,7 +258,7 @@
   // skip: яку умову не застосовувати (щоб порахувати кількості для цього ж фільтра)
   // Тендери, які не показуємо взагалі (за назвою тендеру)
   var HIDE_TITLE = /стоматолог\S*\s+(матеріал|материал)|(матеріал|материал)\S*\s+стоматолог/i;
-  function hidden(t) { return HIDE_TITLE.test(t.t || ''); }
+  function hidden(t) { return HIDE_TITLE.test(t.t || '') || info(t).allExcl; }
   function pass(t, f, skip, range) {
     var i = info(t);
     if (hidden(t)) return false;

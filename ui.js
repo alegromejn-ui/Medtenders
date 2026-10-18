@@ -96,6 +96,13 @@
     if (!p.length) return '';
     return '<div class="active">' + p.map(function (x) { return '<button data-act="unf" data-k="' + x[0] + '" aria-label="Прибрати фільтр ' + esc(x[1]) + '">' + esc(x[1]) + ic('x', 'sm') + '</button>'; }).join('') + '</div>';
   }
+  function winLine(t) {
+    var w = (t.win || []).filter(function (x) { return x && x.n; });
+    if (!w.length) return '';
+    var names = []; w.forEach(function (x) { if (names.indexOf(x.n) < 0) names.push(x.n); });
+    var sum = w.reduce(function (a, x) { return a + (x.a || 0); }, 0);
+    return '<span class="win">' + ic('trophy', 'sm') + '<span><b>' + esc(names[0]) + '</b>' + (names.length > 1 ? ' та ще ' + (names.length - 1) : '') + (sum ? '<i>' + esc(F.fmtMoney(sum, t.cur)) + '</i>' : '') + '</span></span>';
+  }
   function card(t) {
     var i = F.info(t), dl = F.deadline(t), star = !!F.S.starred[t.id];
     var g = i.group;
@@ -109,6 +116,7 @@
       '<span class="org">' + esc(t.org) + '</span>' +
       '<span class="where">' + esc(i.region) + '<span class="sep"></span>' + esc(F.typeName(t.pmt)) + '</span>' +
       '<span class="tags">' + tags + '</span>' +
+      winLine(t) +
       '<span class="tc-foot"><span class="sum">' + (t.val != null ? esc(F.fmtMoney(t.val, t.cur)) : 'Сума не вказана') + '</span><span class="date">' + esc(F.fmtDate(t.pub)) + '</span></span>' +
       '</button>' +
       '<button class="star" data-act="star" data-id="' + esc(t.id) + '" aria-pressed="' + star + '" aria-label="' + (star ? 'Прибрати з обраних' : 'Додати в обрані') + '">' + ic('star') + '</button>' +

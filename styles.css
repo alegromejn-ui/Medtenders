@@ -224,3 +224,9 @@ label.fl{display:block;font-size:14px;font-weight:650;margin:18px 0 7px}
   .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
   h1{font-size:30px}
 }
+
+/* v8: переможець у картці */
+.win{display:flex;align-items:flex-start;gap:7px;margin-top:9px;padding:8px 10px;border-radius:10px;background:var(--soon-soft);font-size:13.5px;line-height:1.35}
+.win svg{color:var(--soon);flex:none;margin-top:1px}
+.win b{font-weight:700}
+.win i{font-style:normal;display:block;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
