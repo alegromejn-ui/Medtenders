@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v2';
+  var VERSION = 'v3';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -178,7 +178,14 @@
   }
 
   // ---------- Синхронізація з Google-скриптом ----------
-  function validUrl(u) { return /^https:\/\/script\.google(usercontent)?\.com\/.+/.test(String(u || '').trim()); }
+  // Прибирає те, що Google додає при кількох акаунтах (/u/1/), пробіли й зайві параметри
+  function normUrl(u) {
+    u = String(u || '').replace(/\s+/g, '');
+    u = u.replace(/^(https:\/\/script\.google\.com)\/(a\/macros\/[^/]+|macros)\/u\/\d+\//, '$1/$2/');
+    u = u.replace(/[?#].*$/, '');
+    return u;
+  }
+  function validUrl(u) { return /^https:\/\/script\.google(usercontent)?\.com\/.+/.test(normUrl(u)); }
   function err(code, detail) { var e = new Error(code); e.code = code; e.detail = detail; return e; }
   function getPage(url, since) {
     var u = url.trim() + (url.indexOf('?') >= 0 ? '&' : '?') + 'limit=' + PAGE + (since ? '&since=' + encodeURIComponent(since) : '');
@@ -194,7 +201,7 @@
   function sync(opts) {
     opts = opts || {};
     if (syncing) return syncing;
-    var url = opts.url || S.url;
+    var url = normUrl(opts.url || S.url);
     if (!validUrl(url)) return Promise.reject(err('NO_URL'));
     var since = opts.url && opts.url !== S.url ? '' : S.since;
     var tot = { added: 0, updated: 0, pages: 0 };
@@ -215,7 +222,9 @@
     var c = e && e.code;
     if (c === 'NO_URL') return 'Вставте URL веб-додатка з Google Apps Script. Він починається з https://script.google.com/';
     if (c === 'NETWORK') return 'Немає зв’язку з Google. Перевірте інтернет і спробуйте ще раз.';
-    if (c === 'HTTP') return 'Google відповів помилкою ' + e.detail + '. Перевірте, що в розгортанні вибрано доступ «Усі».';
+    if (c === 'HTTP' && e.detail === 404) return 'Google не знайшов скрипт за цим URL (помилка 404). Потрібен «URL веб-додатка» з вікна «Керування розгортаннями», що закінчується на /exec, а не /dev і не адреса редактора. Якщо розгортання видалено чи архівовано, створіть нове.';
+    if (c === 'HTTP' && (e.detail === 401 || e.detail === 403)) return 'Google не пускає до скрипта (помилка ' + e.detail + '). У розгортанні має бути доступ «Усі», а не «Будь-хто з обліковим записом Google».';
+    if (c === 'HTTP') return 'Google відповів помилкою ' + e.detail + '. Спробуйте ще раз за хвилину.';
     if (c === 'NOT_JSON') return 'За цим URL відкривається не скрипт Медтендерів. Перевірте, що скопіювали «URL веб-додатка» і доступ «Усі».';
     if (c === 'NOT_OURS') return 'За цим URL працює інший скрипт. Потрібен URL розгортання скрипта Медтендерів.';
     if (c === 'SERVER') return 'Скрипт повернув помилку' + (e.detail ? ': ' + String(e.detail).slice(0, 140) : '') + '.';
@@ -330,7 +339,7 @@
     VERSION: VERSION, CATS: CATS, CAT_BY: CAT_BY, OTHER: OTHER, GROUPS: GROUPS, TYPES: TYPES,
     fetch: function (u, o) { return root.fetch(u, o); },
     get S() { return S; }, all: function () { return ALL; }, byId: function (id) { return BY[id]; },
-    init: init, save: save, sync: sync, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
+    init: init, save: save, sync: sync, normUrl: normUrl, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
     catsOfItem: catsOfItem, info: info, statusName: statusName, statusGroup: statusGroup, typeName: typeName, regionName: regionName, regionList: regionList, typeList: typeList,
     query: query, facets: facets, setF: setF, resetF: resetF, activeCount: activeCount, periodRange: periodRange,
     toggleStar: toggleStar, isNew: isNew, deadline: deadline, prozorroUrl: prozorroUrl,

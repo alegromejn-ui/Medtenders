@@ -310,7 +310,7 @@
   document.addEventListener('submit', function (ev) {
     var form = ev.target.closest('[data-form="url"]'); if (!form) return;
     ev.preventDefault();
-    var url = form.querySelector('#url').value.trim();
+    var url = F.normUrl(form.querySelector('#url').value);
     ui.urlDraft = url;
     if (!F.validUrl(url)) { ui.urlMsg = { ok: false, text: F.errText({ code: 'NO_URL' }) }; render(); return; }
     ui.busy = true; ui.urlMsg = { ok: true, text: 'Перевіряю…' }; render();
