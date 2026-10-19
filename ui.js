@@ -84,6 +84,8 @@
     if (f.type && types.indexOf(f.type) < 0) types.unshift(f.type);
     h += '<label class="fl" for="' + pre + '-type">Вид закупівлі</label><select id="' + pre + '-type" data-change="type"><option value="">Усі види</option>' +
       types.map(function (t) { return '<option value="' + esc(t) + '"' + (f.type === t ? ' selected' : '') + '>' + esc(F.typeName(t)) + (fc.type[t] ? ' (' + fc.type[t] + ')' : '') + '</option>'; }).join('') + '</select>';
+    h += '<label class="fl" for="' + pre + '-min">Сума закупівлі</label><select id="' + pre + '-min" data-change="min">' +
+      F.MIN_OPTS.map(function (o) { return '<option value="' + o[0] + '"' + ((f.min || '') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
     if (F.activeCount()) h += '<button class="btn ghost sm reset" data-act="reset">Скинути фільтри</button>';
     return h + '</div>';
   }
@@ -93,6 +95,7 @@
     if (f.status) p.push(['status', F.GROUPS.filter(function (g) { return g.id === f.status; })[0].name]);
     if (f.region) p.push(['region', f.region]);
     if (f.type) p.push(['type', F.typeName(f.type)]);
+    if ((f.min || '') !== F.DEF_MIN) p.push(['min', (F.MIN_OPTS.filter(function (o) { return o[0] === (f.min || ''); })[0] || ['', 'Сума'])[1]]);
     if (!p.length) return '';
     return '<div class="active">' + p.map(function (x) { return '<button data-act="unf" data-k="' + x[0] + '" aria-label="Прибрати фільтр ' + esc(x[1]) + '">' + esc(x[1]) + ic('x', 'sm') + '</button>'; }).join('') + '</div>';
   }
@@ -270,7 +273,7 @@
       }
       case 'period': F.setF({ period: el.getAttribute('data-v') }); rerenderList(); break;
       case 'status': F.setF({ status: el.getAttribute('data-v') }); rerenderList(); break;
-      case 'unf': { var k = el.getAttribute('data-k'), p = {}; p[k] = k === 'period' ? '30' : ''; F.setF(p); rerenderList(); break; }
+      case 'unf': { var k = el.getAttribute('data-k'), p = {}; p[k] = k === 'period' ? '30' : k === 'min' ? F.DEF_MIN : ''; F.setF(p); rerenderList(); break; }
       case 'reset': F.resetF(); rerenderList(); break;
       case 'filters': ui.sheet = 'filters'; renderSheet(); break;
       case 'more': ui.shown += STEP; render(); break;

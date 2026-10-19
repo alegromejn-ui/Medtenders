@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v11';
+  var VERSION = 'v12';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -13,7 +13,7 @@
     { id: 'suture', name: 'Шовний матеріал', codes: ['33141121', '33141125', '33141126', '33141128'], fallback: ['33141120'],
       re: /шовн|нитк\S*\s+(хірург|медичн|стерил)|хірург\S*\s+нитк|нит[ьи]\s+хирург|хирург\S*\s+нит|лігатур|лигатур|кетгут|атравмат\S*\s+(голк|нит|шов)|голк\S*\s+атравмат|vicryl|вікрил|викрил|prolene|пролен|monocryl|монокрил|\bpds\b|ethilon|етилон|mersilene|safil|сафіл|surgipro|polysorb|полісорб|biosyn|caprosyn|monosyn|моносин|dafilon|premilene|optilene|polyglactin|поліглактин|полиглактин|полігліколев|полигликол|поліпропіленов\S*\s+нит|полипропиленов\S*\s+нит|капроаг|шовк\S*\s+(хірург|плетен)|шелк\S*\s+хирург/ },
     { id: 'instr', name: 'Хірургічний інструмент', codes: ['33141122', '33141410', '33141411', '33162200', '33169'], fallback: ['33162000'],
-      re: /інструмент|инструмент|скальпел|лез[оа]([^а-яіїєґ]|$)|затискач|зажим|пінцет|пинцет|ножиц|ножниц|ретрактор|ранорозшир|ранорасшир|голкотрим|иглодерж|корнцанг|кюретк|распатор|долото|кусачк|степлер|зшивальн\S*\s+апарат|сшивающ|кліпатор|клипатор|троакар|дисектор|диссектор|гачок\s+хірург|крючок\s+хирург|ложк\S*\s+(хірург|кістков|гінек)|дзеркал\S*\s+(гінек|вагін|носов|вушн|стоматолог)|зонд\S*\s+стоматолог|екскаватор|экскаватор|гладилк|штопфер|елеватор|элеватор|щипц\S*\s+(для\s+видал|стоматолог|хірург|хирург)|скоб\S*\s+(хірург|шкірн|для\s+степлер)|касет\S*\s+(до|для)\s+(степлер|зшив)/, not: /помп|інфузійн|инфузион|магістрал|катетер/ },
+      re: /інструмент|инструмент|скальпел|затискач|зажим|пінцет|пинцет|ножиц|ножниц|ретрактор|ранорозшир|ранорасшир|голкотрим|иглодерж|корнцанг|кюретк|распатор|долото|кусачк|степлер|зшивальн\S*\s+апарат|сшивающ|кліпатор|клипатор|троакар|дисектор|диссектор|гачок\s+хірург|крючок\s+хирург|ложк\S*\s+(хірург|кістков|гінек)|дзеркал\S*\s+(гінек|вагін|носов|вушн|стоматолог)|зонд\S*\s+стоматолог|екскаватор|экскаватор|гладилк|штопфер|елеватор|элеватор|щипц\S*\s+(для\s+видал|стоматолог|хірург|хирург)|скоб\S*\s+(хірург|шкірн|для\s+степлер)|касет\S*\s+(до|для)\s+(степлер|зшив)/, not: /помп|інфузійн|инфузион|магістрал|катетер/ },
     { id: 'plaster', name: 'Пластирі', codes: ['33141111', '33141112'],
       re: /пластир|пластыр|л\/пласт|plaster|tegaderm|cosmopor|omniplast|omnifix|hypafix|mefix/ },
     { id: 'dressing', name: 'Пов’язки', codes: ['33141110', '33141113', '33141114', '33141116', '33141118', '33141119'],
@@ -27,11 +27,16 @@
     { id: 'wax', name: 'Хірургічний віск', codes: [],
       re: /віск(?!оз)|воск(?!оз)|wax/ },
     { id: 'glue', name: 'Хірургічний клей', codes: [],
-      re: /клей(?!к)|клею|клея(?!щ)|клеєм|адгезив([^н]|$)|адгезів|dermabond|дермабонд|гістоакрил|гистоакрил|histoacryl|ціаноакрил|цианоакрил|bioglue|tissucol|тісукол|фібринов\S*\s+клей|фибринов\S*\s+кле|evicel|liquiband|glubran|глубран|leukosan/ },
+      re: /клей(?!к)|клею|клея(?!щ)|клеєм|адгезив([^н]|$)|адгезів|dermabond|дермабонд|гістоакрил|гистоакрил|histoacryl|ціаноакрил|цианоакрил|bioglue|tissucol|тісукол|фібринов\S*\s+клей|фибринов\S*\s+кле|evicel|liquiband|glubran|глубран|leukosan/,
+      // адгезивна стрічка, клейкий край покриття, адгезія покриття до шкіри — це не клей
+      not: /стрічк|лент[аиуі]|смуг|кра[їєй]|краю|покритт|покрыти|простирадл|простын|плівк|пленк|пластир|пластыр|повязк|самоклею|клейов\S*\s+(основ|шар|смуг|кра)|адгези\S*\s+(стрічк|лент|кра|шар|смуг|основ|покритт|властив)|адгезі[яїє]|adhesive\s+(tape|strip|drape)/,
+      strong: /дермабонд|dermabond|гістоакрил|гистоакрил|histoacryl|ціаноакрил|цианоакрил|bioglue|tissucol|тісукол|фібринов\S*\s+клей|фибринов\S*\s+кле|evicel|liquiband|glubran|глубран|leukosan|(хірургічн|тканинн|медичн|хирургическ|тканев)\S*\s+(біо)?(клей|кле[ий])/ },
     { id: 'hemo', name: 'Гемостатичні матеріали', codes: ['33141127'],
       re: /гемостат|гемостаз|кровоспин|кровоостан|surgicel|сурджісел|сурджисел|tachocomb|тахокомб|tachosil|тахосіл|тахосил|spongostan|спонгостан|желатинов\S*\s+губк|колагенов\S*\s+губк|коллагенов\S*\s+губк|окиснен\S*\s+(регенерован\S*\s+)?целюлоз|окисленн\S*\s+(регенерированн\S*\s+)?целлюлоз|floseal|флосіл|surgiflo|hemopatch|гемопатч|arista|celox|целокс|quikclot|гемоблок|lyostypt|traumastem|травмастем/, not: /затискач|зажим|пінцет|пинцет|ножиц|інструмент|инструмент|клапан|інтродюсер|интродьюсер|катетер/ }
   ];
   var CAT_BY = {}; CATS.forEach(function (c) { CAT_BY[c.id] = c; });
+  var BLADE = /(^|[^а-яіїєґ])лез(о|а|ом|ам|ами|у|и)(?=[^а-яіїєґ]|$)(\s+(для|до)\s+скальпел\S*)?|(^|[^а-яіїєґ])(леза|лезо)\s+(хірург|скальпел)\S*/;
+  var BLADE_G = new RegExp(BLADE.source, 'g');
   // Ознаки ниток/шва в описі (опис уже в нижньому регістрі без апострофів)
   var SUT_DESC = /нитк|нитей|нит[иь]([^а-яіїєґ]|$)|шовн|лігатур|лигатур|кетгут|атравмат\S*\s+(голк|нит|шов)|голк\S*\s+атравмат|\busp\b|(^|[^\d])\d{1,2}\/0([^\d]|$)|vicryl|вікрил|викрил|prolene|пролен|monocryl|монокрил|\bpds\b|ethilon|етилон|mersilene|safil|сафіл|surgipro|polysorb|полісорб|biosyn|caprosyn|monosyn|моносин|dafilon|premilene|optilene|поліглактин|полиглактин|полігліколев|полигликол/;
   var OTHER = { id: 'other', name: 'Інше в 3314/3316' };
@@ -43,7 +48,7 @@
     var code = digits(it.c), d = norm(it.d), out = [];
     CATS.forEach(function (c) {
       var hit = c.codes.some(function (p) { return code.indexOf(p) === 0; }) || c.re.test(d);
-      if (hit && c.not && c.not.test(d) && !c.codes.some(function (p) { return code.indexOf(p) === 0; })) hit = false;
+      if (hit && c.not && c.not.test(d) && !(c.strong && c.strong.test(d)) && !c.codes.some(function (p) { return code.indexOf(p) === 0; })) hit = false;
       if (hit) out.push(c.id);
     });
     // Нитки часто публікують під кодом перев’язувального матеріалу (33141110 та сусідні): це шовний матеріал, а не пов’язки.
@@ -55,6 +60,9 @@
         return CAT_BY[x].re.test(d.replace(/перевязувальн\S*|перевязочн\S*/g, ' ')); // «перев’язувальний матеріал» — це лише назва коду
       });
     }
+    // Леза (в тому числі одноразові для скальпеля) — не інструмент, навіть якщо код ДК «інструментальний».
+    // Скальпель чи інший інструмент у тому ж описі лишається інструментом.
+    if (out.indexOf('instr') >= 0 && BLADE.test(d) && !CAT_BY.instr.re.test(d.replace(BLADE_G, ' '))) out = out.filter(function (x) { return x !== 'instr'; });
     if (out.indexOf('kit') >= 0) out = out.filter(function (x) { return x !== 'drape'; });
     if (!out.length) CATS.forEach(function (c) { if ((c.fallback || []).some(function (p) { return code.indexOf(p) === 0; })) out.push(c.id); });
     return out;
@@ -132,7 +140,8 @@
   function typeList(extra) { var out = TYPE_ORDER.slice(); Object.keys(extra || {}).forEach(function (t) { if (t && out.indexOf(t) < 0) out.push(t); }); return out; }
 
   // ---------- Стан ----------
-  var DEF_F = { cats: [], period: '30', from: '', to: '', region: '', type: '', status: '', sort: 'new', q: '' };
+  var DEF_F = { cats: [], period: '30', from: '', to: '', region: '', type: '', status: '', min: '30000', sort: 'new', q: '' };
+  var MIN_OPTS = [['', 'Будь-яка сума'], ['30000', 'Понад 30 000 ₴'], ['100000', 'Понад 100 000 ₴'], ['500000', 'Понад 500 000 ₴'], ['1000000', 'Понад 1 000 000 ₴']];
   function defaults() { return { url: '', since: '', lastSync: 0, prevOpen: 0, lastOpen: 0, server: null, starred: {}, f: JSON.parse(JSON.stringify(DEF_F)) }; }
   var S = defaults();
   var ALL = [];            // тендери в пам’яті
@@ -287,6 +296,7 @@
     if (skip !== 'region' && f.region && i.region !== f.region) return false;
     if (skip !== 'type' && f.type && t.pmt !== f.type) return false;
     if (skip !== 'status' && f.status && i.group !== f.status) return false;
+    if (skip !== 'min' && f.min && t.val != null && (t.cur || 'UAH') === 'UAH' && !(t.val > Number(f.min))) return false;
     if (skip !== 'q' && f.q) { var words = norm(f.q).trim().split(' '); for (var k = 0; k < words.length; k++) if (words[k] && i.hay.indexOf(words[k]) < 0) return false; }
     return true;
   }
@@ -322,7 +332,7 @@
   }
   function setF(patch) { Object.keys(patch).forEach(function (k) { S.f[k] = patch[k]; }); save(); }
   function resetF() { var keep = S.f.sort; S.f = JSON.parse(JSON.stringify(DEF_F)); S.f.sort = keep; save(); }
-  function activeCount(f) { f = f || S.f; var n = 0; if (f.cats.length) n++; if (f.period !== DEF_F.period) n++; if (f.region) n++; if (f.type) n++; if (f.status) n++; return n; }
+  function activeCount(f) { f = f || S.f; var n = 0; if (f.cats.length) n++; if (f.period !== DEF_F.period) n++; if (f.region) n++; if (f.type) n++; if (f.status) n++; if ((f.min || '') !== DEF_F.min) n++; return n; }
 
   function toggleStar(id) { if (S.starred[id]) delete S.starred[id]; else S.starred[id] = Date.now(); save(); return !!S.starred[id]; }
   function isNew(t) { return S.prevOpen > 0 && pubMs(t) > S.prevOpen; }
@@ -360,7 +370,7 @@
   function wipe() { ALL = []; BY = {}; var url = S.url, starred = S.starred; S = defaults(); S.url = url; S.starred = starred; save(); return dbClear(); }
 
   var api = {
-    VERSION: VERSION, CATS: CATS, CAT_BY: CAT_BY, OTHER: OTHER, GROUPS: GROUPS, TYPES: TYPES,
+    VERSION: VERSION, MIN_OPTS: MIN_OPTS, DEF_MIN: DEF_F.min, CATS: CATS, CAT_BY: CAT_BY, OTHER: OTHER, GROUPS: GROUPS, TYPES: TYPES,
     fetch: function (u, o) { return root.fetch(u, o); },
     get S() { return S; }, all: function () { return ALL; }, byId: function (id) { return BY[id]; },
     init: init, save: save, sync: sync, normUrl: normUrl, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
