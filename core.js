@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v10';
+  var VERSION = 'v11';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -32,6 +32,8 @@
       re: /гемостат|гемостаз|кровоспин|кровоостан|surgicel|сурджісел|сурджисел|tachocomb|тахокомб|tachosil|тахосіл|тахосил|spongostan|спонгостан|желатинов\S*\s+губк|колагенов\S*\s+губк|коллагенов\S*\s+губк|окиснен\S*\s+(регенерован\S*\s+)?целюлоз|окисленн\S*\s+(регенерированн\S*\s+)?целлюлоз|floseal|флосіл|surgiflo|hemopatch|гемопатч|arista|celox|целокс|quikclot|гемоблок|lyostypt|traumastem|травмастем/, not: /затискач|зажим|пінцет|пинцет|ножиц|інструмент|инструмент|клапан|інтродюсер|интродьюсер|катетер/ }
   ];
   var CAT_BY = {}; CATS.forEach(function (c) { CAT_BY[c.id] = c; });
+  // Ознаки ниток/шва в описі (опис уже в нижньому регістрі без апострофів)
+  var SUT_DESC = /нитк|нитей|нит[иь]([^а-яіїєґ]|$)|шовн|лігатур|лигатур|кетгут|атравмат\S*\s+(голк|нит|шов)|голк\S*\s+атравмат|\busp\b|(^|[^\d])\d{1,2}\/0([^\d]|$)|vicryl|вікрил|викрил|prolene|пролен|monocryl|монокрил|\bpds\b|ethilon|етилон|mersilene|safil|сафіл|surgipro|polysorb|полісорб|biosyn|caprosyn|monosyn|моносин|dafilon|premilene|optilene|поліглактин|полиглактин|полігліколев|полигликол/;
   var OTHER = { id: 'other', name: 'Інше в 3314/3316' };
 
   function norm(s) { return String(s == null ? '' : s).toLowerCase().replace(/[’ʼ'`ʹ]/g, '').replace(/ё/g, 'е').replace(/\s+/g, ' '); }
@@ -44,6 +46,15 @@
       if (hit && c.not && c.not.test(d) && !c.codes.some(function (p) { return code.indexOf(p) === 0; })) hit = false;
       if (hit) out.push(c.id);
     });
+    // Нитки часто публікують під кодом перев’язувального матеріалу (33141110 та сусідні): це шовний матеріал, а не пов’язки.
+    // Код сам по собі пов’язку не робить, якщо в описі явно нитки/шов; власні слова пов’язки (бинт, марля…) діють як і раніше.
+    if (SUT_DESC.test(d)) {
+      if (code.indexOf('3314') === 0 && out.indexOf('suture') < 0) out.push('suture');
+      out = out.filter(function (x) {
+        if (x !== 'dressing' && x !== 'plaster') return true;
+        return CAT_BY[x].re.test(d.replace(/перевязувальн\S*|перевязочн\S*/g, ' ')); // «перев’язувальний матеріал» — це лише назва коду
+      });
+    }
     if (out.indexOf('kit') >= 0) out = out.filter(function (x) { return x !== 'drape'; });
     if (!out.length) CATS.forEach(function (c) { if ((c.fallback || []).some(function (p) { return code.indexOf(p) === 0; })) out.push(c.id); });
     return out;
