@@ -2,10 +2,11 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v19';
+  var VERSION = 'v20';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
+  // @@srv-begin
   // ---------- Категорії товарів ----------
   // codes: позиції з таким кодом ДК (початок коду) потрапляють у категорію одразу.
   // re: слова в описі позиції (опис спершу переводиться в нижній регістр, апострофи прибираються).
@@ -42,6 +43,11 @@
       re: /(титан|полімер|полимер)\S*[^.;]{0,30}(кліпс|клипс|\bclips?\b)|(кліпс|клипс|\bclips?\b)\S*[^.;]{0,30}(титан|полімер|полимер)|гемолок|hem-?o-?lok|ligaclip|лігакліп|лигаклип/,      // не носові (назальні), не в складі набору, не побутові/електродні
       not: /назал|носов|для\s+носа|nasal|набір|набор|комплект|(у|в)\s+складі|(у|в)\s+наборі|електрод|екг|кабел|пульсоксиметр|волос/ },
     { id: 'usgen', name: 'Генератор ультразвуковий', codes: [], re: /генератор\S*[^.;]{0,40}ультразвук|ультразвук\S*[^.;]{0,40}генератор|ultrasonic\s+generator|generator\s+ultrasonic/ },
+    { id: 'lap', name: 'Лапароскопічне обладнання', codes: [],
+      re: /(лапароскоп|артроскоп)\S*[^.;]{0,30}(стійк|стойк)|(стійк|стойк)\S*[^.;]{0,30}(лапароскоп|артроскоп)/ },
+    { id: 'retr', name: 'Ретракторні системи', codes: [],
+      // багаторазові; одноразові ретракторні системи — як усі одноразові інструменти, не цікавлять
+      re: /ретракторн|ретракційн\S*\s+систем|систем\S*\s+ретракц/, not: /одноразов|disposable|single-?use/ },
     { id: 'endo', name: 'Ендо', codes: [],
       // касети (картриджі) для хірургічних ендо-апаратів, зшиваючих і шовних апаратів; стерильні/одноразові касети й касети з розміром у мм теж; тестові й лабораторні — ні
       re: /касет\S*[^.;]{0,60}(зшив|сшив|степлер|ендо|шовн|лінійн|кругов|циркуляр|апарат|gia|stapl|стерил|одноразов|\d\s*мм)|(стерил|одноразов)\S*\s+касет|(зшив|сшив|степлер|ендо)\S*[^.;]{0,50}касет|картридж\S*[^.;]{0,40}(зшив|сшив|степлер)|(зшив|сшив|степлер)\S*[^.;]{0,40}картридж|endo\s*gia|echelon|ендо\s*гіа|tri-?staple|ендостеплер|перезарядн\S*\s+(блок|касет|заряд)/,
@@ -92,6 +98,8 @@
     if (out.indexOf('kit') >= 0) out = out.filter(function (x) { return x !== 'drape'; });
     // Ендо (касети для апаратів і шовних апаратів) і сітки — самостійні категорії: без інструмента, покриттів, шовного тощо.
     if (out.indexOf('endo') >= 0) out = ['endo'];
+    else if (out.indexOf('lap') >= 0) out = ['lap'];
+    else if (out.indexOf('retr') >= 0) out = ['retr'];
     else if (out.indexOf('mesh') >= 0) out = ['mesh'];
     // Шовний матеріал і гемостатики — самостійні: позиція з них не потрапляє в інші категорії.
     if (out.indexOf('suture') >= 0 || out.indexOf('hemo') >= 0) out = out.filter(function (x) { return x === 'suture' || x === 'hemo'; });
@@ -109,15 +117,22 @@
   var DRAIN_SYS = /систем\S*\s+(для\s+)?дренув|систем\S*\s+дренаж|дренажн\S*\s+систем|дренувальн\S*\s+систем|drainage\s+system/;
   // Халати — ваш товар, навіть якщо в описі є інший одяг (напр. «комплект: халат, шапочка»)
   function excluded(d) { return (EXCL_ITEM.test(d) && !/халат/.test(d)) || ORTHO.test(d) || (DRAIN_SYS.test(d) && !/блейк|blake/.test(d)); }
-  function info(t) {
-    if (t._i && t._i.mod === t.mod) return t._i;
+  // Розбір позицій тендеру за категоріями (одна й та сама логіка в додатку й у скрипті вивантаження)
+  function classifyItems(t) {
     var cats = {}, items = (t.items || []).map(function (it) {
       if (excluded(norm(it.d))) return { it: it, cats: [], excl: true };
       var cs = catsOfItem(it);
       if (!cs.length && catsOfItem(it, true).indexOf('instr') >= 0) return { it: it, cats: [], excl: true };
       cs.forEach(function (c) { cats[c] = (cats[c] || 0) + 1; }); return { it: it, cats: cs };
     });
-    var allExcl = items.length > 0 && items.every(function (x) { return x.excl; });
+    return { cats: cats, items: items, allExcl: items.length > 0 && items.every(function (x) { return x.excl; }) };
+  }
+  // Тендери, які не показуємо взагалі (за назвою тендеру)
+  var HIDE_TITLE = /стоматолог\S*\s+(матеріал|материал)|(матеріал|материал)\S*\s+стоматолог/i;
+  // @@srv-end
+  function info(t) {
+    if (t._i && t._i.mod === t.mod) return t._i;
+    var cl = classifyItems(t), cats = cl.cats, items = cl.items, allExcl = cl.allExcl;
     var hay = norm([t.t, t.org, t.edr, t.tid, t.loc, t.reg].concat((t.items || []).map(function (i) { return i.d; })).join(' | '));
     var i = { mod: t.mod, cats: cats, catList: Object.keys(cats), items: items, matched: items.filter(function (x) { return x.cats.length; }).length, hay: hay, region: regionName(t.reg), group: statusGroup(t.st), allExcl: allExcl };
     try { Object.defineProperty(t, '_i', { value: i, enumerable: false, configurable: true, writable: true }); } catch (e) { /* ignore */ }
@@ -155,6 +170,7 @@
     simple: 'Закупівля без системи', 'aboveThresholdUA.defense': 'Оборонні торги', 'simple.defense': 'Оборонна спрощена'
   };
   function typeName(p) { return TYPES[p] || p || 'Інший вид'; }
+  // @@srv-begin
   var REGIONS = ['м. Київ', 'Вінницька обл.', 'Волинська обл.', 'Дніпропетровська обл.', 'Донецька обл.', 'Житомирська обл.', 'Закарпатська обл.',
     'Запорізька обл.', 'Івано-Франківська обл.', 'Київська обл.', 'Кіровоградська обл.', 'Луганська обл.', 'Львівська обл.', 'Миколаївська обл.',
     'Одеська обл.', 'Полтавська обл.', 'Рівненська обл.', 'Сумська обл.', 'Тернопільська обл.', 'Харківська обл.', 'Херсонська обл.',
@@ -174,6 +190,7 @@
     return m ? m[1] + ' обл.' : r;
   }
   // Повні списки для фільтрів: усі регіони й види, навіть якщо тендерів з ними ще немає
+  // @@srv-end
   function regionList(extra) { var out = REGIONS.slice(); Object.keys(extra || {}).forEach(function (r) { if (out.indexOf(r) < 0) out.push(r); }); return out; }
   function typeList(extra) { var out = TYPE_ORDER.slice(); Object.keys(extra || {}).forEach(function (t) { if (t && out.indexOf(t) < 0) out.push(t); }); return out; }
 
@@ -277,13 +294,32 @@
         tot.pages++;
         return merge(j.tenders || []).then(function (r) {
           tot.added += r.added; tot.updated += r.updated; since = j.next || since;
-          S.url = url.trim(); S.since = since; S.apiV = j.v || 1; S.server = j.server || null; S.total = j.total; S.lastSync = Date.now(); save();
+          S.url = url.trim(); S.since = since; S.apiV = j.v || 1; S.server = j.server || null; S.exp = j.exp || null; S.total = j.total; S.lastSync = Date.now(); save();
           if (j.more && guard < 60) return step(guard + 1);
           return tot;
         });
       });
     })(0).then(function (r) { syncing = null; return r; }, function (e) { syncing = null; throw e; });
     return syncing;
+  }
+  // Вивантаження в Google-таблицю: скрипт сам виконує роботу, додаток лише просить запустити її зараз
+  var exporting = null;
+  function exportNow() {
+    if (exporting) return exporting;
+    var url = normUrl(S.url);
+    if (!validUrl(url)) return Promise.reject(err('NO_URL'));
+    var u = url + '?action=export';
+    exporting = api.fetch(u, { redirect: 'follow', cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw err('HTTP', r.status);
+      return r.json().catch(function () { throw err('NOT_JSON'); });
+    }, function () { throw err('NETWORK'); }).then(function (j) {
+      if (!j || j.app !== 'medtender') throw err('NOT_OURS');
+      if (j.tenders) throw err('OLD_SCRIPT');
+      if (!j.ok) throw err('EXPORT', j.message || j.error);
+      S.exp = Object.assign({}, S.exp || {}, { on: true, at: Date.now(), added: j.added || 0, winners: j.winners || 0, err: '' }); save();
+      exporting = null; return j;
+    }).then(function (j) { return j; }, function (e) { exporting = null; throw e; });
+    return exporting;
   }
   function errText(e) {
     var c = e && e.code;
@@ -294,6 +330,8 @@
     if (c === 'HTTP') return 'Google відповів помилкою ' + e.detail + '. Спробуйте ще раз за хвилину.';
     if (c === 'NOT_JSON') return 'За цим URL відкривається не скрипт Медтендерів. Перевірте, що скопіювали «URL веб-додатка» і доступ «Усі».';
     if (c === 'NOT_OURS') return 'За цим URL працює інший скрипт. Потрібен URL розгортання скрипта Медтендерів.';
+    if (c === 'OLD_SCRIPT') return 'У Google стоїть стара версія скрипта. Вставте новий medtender.gs, збережіть і створіть нову версію розгортання («Розгорнути» → «Керувати розгортаннями» → олівець → «Нова версія»).';
+    if (c === 'EXPORT') return String(e.detail || 'Вивантаження не вдалося.').slice(0, 300);
     if (c === 'SERVER') return 'Скрипт повернув помилку' + (e.detail ? ': ' + String(e.detail).slice(0, 140) : '') + '.';
     return 'Не вдалося оновити: ' + (e && e.message ? e.message : e);
   }
@@ -317,8 +355,6 @@
   function endMs(t) { var x = Date.parse(t.end || ''); return isNaN(x) ? 0 : x; }
 
   // skip: яку умову не застосовувати (щоб порахувати кількості для цього ж фільтра)
-  // Тендери, які не показуємо взагалі (за назвою тендеру)
-  var HIDE_TITLE = /стоматолог\S*\s+(матеріал|материал)|(матеріал|материал)\S*\s+стоматолог/i;
   function hidden(t) { return HIDE_TITLE.test(t.t || '') || info(t).allExcl; }
   function pass(t, f, skip, range) {
     var i = info(t);
@@ -412,7 +448,7 @@
     VERSION: VERSION, MIN_OPTS: MIN_OPTS, DEF_MIN: DEF_F.min, CATS: CATS, CAT_BY: CAT_BY, OTHER: OTHER, GROUPS: GROUPS, TYPES: TYPES,
     fetch: function (u, o) { return root.fetch(u, o); },
     get S() { return S; }, all: function () { return ALL; }, byId: function (id) { return BY[id]; },
-    init: init, save: save, sync: sync, normUrl: normUrl, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
+    init: init, save: save, sync: sync, exportNow: exportNow, normUrl: normUrl, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
     catsOfItem: catsOfItem, info: info, statusName: statusName, statusGroup: statusGroup, typeName: typeName, regionName: regionName, regionList: regionList, typeList: typeList,
     query: query, facets: facets, setF: setF, resetF: resetF, activeCount: activeCount, periodRange: periodRange,
     toggleStar: toggleStar, isNew: isNew, deadline: deadline, prozorroUrl: prozorroUrl,

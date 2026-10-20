@@ -232,6 +232,23 @@
       if (sv && sv.lastRun && Date.now() - sv.lastRun > 3 * 3600e3) h += '<p class="msg bad">' + ic('alert', 'sm') + 'Скрипт не запускався понад 3 години. Відкрийте Apps Script → Тригери й перевірте, що є тригер «sync» кожні 10 хвилин.</p>';
     }
     h += '</section>';
+    if (S.url) {
+      var ex = S.exp;
+      h += '<section class="panel"><h2>Вивантаження в Google-таблицю</h2>';
+      if (!ex) h += '<p class="sub">Вставте новий файл <b>medtender.gs</b> у скрипт (кроки нижче), і тут з’явиться стан вивантаження.</p>';
+      else if (!ex.on) h += '<p class="sub">Вивантаження вимкнене: у коді скрипта в рядок <b>EXPORT_SHEET_URL</b> ще не вставлено посилання на таблицю.</p>';
+      else {
+        h += '<p class="sub">Щодня з понеділка по п’ятницю близько ' + (ex.hour || 8) + ':00 скрипт дописує нові тендери зверху аркуша «Розробка». Дані за п’ятницю, суботу й неділю потрапляють у понеділок.</p>' +
+          '<dl class="stat"><div><dt>Останнє вивантаження</dt><dd>' + esc(ex.at ? ago(ex.at) : 'ще не було') + '</dd></div>' +
+          '<div><dt>Додано рядків</dt><dd>' + (ex.added || 0) + '</dd></div>' +
+          '<div><dt>Дописано переможців</dt><dd>' + (ex.winners || 0) + '</dd></div></dl>';
+        if (ex.err) h += '<p class="msg bad">' + ic('alert', 'sm') + esc(ex.err) + '</p>';
+        if (ui.expMsg) h += '<p class="msg ' + (ui.expMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.expMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.expMsg.text) + '</p>';
+        h += '<div class="btns"><button class="btn sm" data-act="export"' + (ui.exporting ? ' disabled' : '') + '>' + ic('refresh', ui.exporting ? 'spin' : 'sm') + (ui.exporting ? 'Вивантажую…' : 'Вивантажити зараз') + '</button></div>' +
+          '<p class="fine">Кнопка додає все, що з’явилося після попереднього вивантаження, і нічого не дублює. Рядки, які ви вже внесли, скрипт не змінює: лише дописує переможця в порожню клітинку.</p>';
+      }
+      h += '</section>';
+    }
     h += '<section class="panel"><h2>Як встановити скрипт</h2><ol class="steps">' +
       '<li>Створіть нову Google Таблицю: відкрийте <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> і назвіть її, наприклад, «Медтендери».</li>' +
       '<li>Меню «Розширення» → «Apps Script». Видаліть увесь код і вставте вміст файлу <b>medtender.gs</b>. Збережіть.</li>' +
@@ -291,6 +308,15 @@
         else toast(v);
         break;
       }
+      case 'export':
+        if (ui.exporting) break;
+        ui.exporting = true; ui.expMsg = null; render();
+        F.exportNow().then(function (r) {
+          ui.exporting = false;
+          ui.expMsg = { ok: true, text: r.skipped ? 'Сьогодні вихідний, нічого не додано.' : (r.added ? 'Додано рядків: ' + r.added : 'Нових тендерів для таблиці немає') + (r.winners ? '; переможців: ' + r.winners : '') + '.' };
+          render();
+        }, function (e) { ui.exporting = false; ui.expMsg = { ok: false, text: F.errText(e) }; render(); });
+        break;
       case 'wipe':
         if (!window.confirm('Стерти тендери з цього телефону? Таблиця Google не зміниться.')) break;
         F.wipe().then(function () { toast('Стерто. Завантажую наново…'); render(); doSync(true); });
