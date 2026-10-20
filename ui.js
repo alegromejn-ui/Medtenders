@@ -17,7 +17,7 @@
     var h = Math.round(m / 60); if (h < 24) return h + ' год тому';
     return F.fmtDate(new Date(ms).toISOString(), true);
   }
-  var PERIODS = [['today', 'Сьогодні'], ['7', '7 днів'], ['30', '30 днів'], ['90', '90 днів'], ['all', 'Усі'], ['custom', 'Свій період']];
+  var PERIODS = [['today', 'Сьогодні'], ['yesterday', 'Вчора'], ['7', '7 днів'], ['30', '30 днів'], ['90', '90 днів'], ['all', 'Усі'], ['custom', 'Свій період']];
   var SORTS = [['new', 'Нові'], ['deadline', 'За строком'], ['value', 'Дорожчі']];
   function periodLabel(f) {
     if (f.period === 'custom') return (f.from ? 'з ' + F.fmtDate(f.from) : '') + (f.from && f.to ? ' ' : '') + (f.to ? 'до ' + F.fmtDate(f.to) : '') || 'Свій період';
