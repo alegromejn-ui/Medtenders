@@ -230,3 +230,9 @@ label.fl{display:block;font-size:14px;font-weight:650;margin:18px 0 7px}
 .win svg{color:var(--soon);flex:none;margin-top:1px}
 .win b{font-weight:700}
 .win i{font-style:normal;display:block;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+
+/* v13: кілька категорій одразу — галочка на вибраних, список у шторці переноситься */
+.cat[aria-pressed="true"]::before{content:"✓";font-weight:800;margin-right:-2px}
+.catsin legend small{font-weight:500;color:var(--muted);margin-left:6px}
+.catsin .cats{flex-wrap:wrap;overflow:visible;margin:8px 0 2px;padding:0}
+@media (min-width:980px){.catsin{display:none}}

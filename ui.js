@@ -71,6 +71,7 @@
   function filterForm(fc, pre) {
     pre = pre || 'f';
     var f = F.S.f, h = '<div class="ff">';
+    h += '<fieldset class="catsin"><legend>Товари <small>можна обрати кілька</small></legend>' + catChips(fc) + '</fieldset>';
     h += '<fieldset><legend>Дата оголошення</legend><div class="pills">' + PERIODS.map(function (p) { return '<button data-act="period" data-v="' + p[0] + '" aria-pressed="' + (f.period === p[0]) + '">' + p[1] + '</button>'; }).join('') + '</div>';
     if (f.period === 'custom') h += '<div class="dates"><label>З<input type="date" data-change="from" value="' + esc(f.from) + '"></label><label>По<input type="date" data-change="to" value="' + esc(f.to) + '"></label></div>';
     h += '</fieldset>';
