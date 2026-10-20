@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v18';
+  var VERSION = 'v19';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -53,6 +53,7 @@
   // Комплектуючі, запчастини, обслуговування й приладдя для інших інструментів не рахуються.
   var ACC_G = /(^|[^а-яіїєґ])(комплектуюч|запчаст|запасн|ремонт|обслуговув|сервіс|змащ|мастил|чистк|очищенн|стерилізац|контейнер|лоток|футляр|кейс|ящик|коробк|рукоятк|ручк|тримач|насадк|наконечник|кабел|акумулятор|батаре|педал|адаптер|заточ|підставк|стійк|штатив|сумк|органайзер|гвинт|пружин|кришк|втулк|прокладк|ущільн|ключ)\S*/g;
   var FORINSTR_G = /(для|до|під)\s+(\S+\s+){0,2}(скальпел|інструмент|ножиц|ножниц|затискач|пінцет|степлер|кліпатор|апарат|електрод|троакар|ретрактор|коагулятор)\S*/g;
+  var DISPOSABLE = /одноразов|однократн|disposable|single-?use/;
   var DRAIN = /дренаж\S*|дренув\S*|дренір\S*|дренирован\S*|\bdrain\S*/;
   var DRAIN_G = new RegExp(DRAIN.source, 'g');
   var BLADE_G = new RegExp(BLADE.source, 'g');
@@ -63,7 +64,7 @@
   function norm(s) { return String(s == null ? '' : s).toLowerCase().replace(/[’ʼ'`ʹ]/g, '').replace(/ё/g, 'е').replace(/\s+/g, ' '); }
   function digits(code) { return String(code || '').split('-')[0]; }
 
-  function catsOfItem(it) {
+  function catsOfItem(it, keepDisposable) {
     var code = digits(it.c), d = norm(it.d), out = [];
     CATS.forEach(function (c) {
       var hit = c.codes.some(function (p) { return code.indexOf(p) === 0; }) || c.re.test(d);
@@ -84,6 +85,8 @@
     if (out.indexOf('instr') >= 0 && BLADE.test(d) && !CAT_BY.instr.re.test(d.replace(BLADE_G, ' '))) out = out.filter(function (x) { return x !== 'instr'; });
     if (out.indexOf('instr') >= 0 && (new RegExp(ACC_G.source).test(d) || new RegExp(FORINSTR_G.source).test(d)) &&
         !CAT_BY.instr.re.test(d.replace(FORINSTR_G, ' ').replace(ACC_G, ' '))) out = out.filter(function (x) { return x !== 'instr'; });
+    // Одноразові хірургічні інструменти не цікавлять (одноразові касети, халати, покриття, шовний тощо цього правила не стосується)
+    if (!keepDisposable && out.indexOf('instr') >= 0 && DISPOSABLE.test(d)) out = out.filter(function (x) { return x !== 'instr'; });
     // Системи дренування — не інструмент (ні за кодом, ні за словами), якщо в описі немає власне інструмента.
     if (out.indexOf('instr') >= 0 && DRAIN.test(d) && !CAT_BY.instr.re.test(d.replace(DRAIN_G, ' '))) out = out.filter(function (x) { return x !== 'instr'; });
     if (out.indexOf('kit') >= 0) out = out.filter(function (x) { return x !== 'drape'; });
@@ -110,7 +113,9 @@
     if (t._i && t._i.mod === t.mod) return t._i;
     var cats = {}, items = (t.items || []).map(function (it) {
       if (excluded(norm(it.d))) return { it: it, cats: [], excl: true };
-      var cs = catsOfItem(it); cs.forEach(function (c) { cats[c] = (cats[c] || 0) + 1; }); return { it: it, cats: cs };
+      var cs = catsOfItem(it);
+      if (!cs.length && catsOfItem(it, true).indexOf('instr') >= 0) return { it: it, cats: [], excl: true };
+      cs.forEach(function (c) { cats[c] = (cats[c] || 0) + 1; }); return { it: it, cats: cs };
     });
     var allExcl = items.length > 0 && items.every(function (x) { return x.excl; });
     var hay = norm([t.t, t.org, t.edr, t.tid, t.loc, t.reg].concat((t.items || []).map(function (i) { return i.d; })).join(' | '));
