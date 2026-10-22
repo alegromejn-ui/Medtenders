@@ -433,7 +433,7 @@
   // Беремо всі тендери 3314/3316 із додатка (період, суму й категорії з головної сторінки не застосовуємо),
   // але те, що не цікавить (виключені товари, переговорні процедури), не показуємо.
   function nameKey(s) { return norm(s).replace(/[«»"“”„]/g, '').replace(/\s+/g, ' ').trim(); }
-  function winnerKey(w) { return nameKey(w && w.n); }
+  function winnerKey(w) { var e = String((w && w.e) || '').replace(/\D/g, ''); return e ? 'e:' + e : 'n:' + nameKey(w && w.n); }
   function orgKey(t) { var e = String(t.edr || '').replace(/\D/g, ''); return e ? 'e:' + e : 'n:' + nameKey(t.org); }
   function pick(test, opts) {
     opts = opts || {};
