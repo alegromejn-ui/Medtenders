@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v21';
+  var VERSION = 'v22';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -121,7 +121,7 @@
   // Розбір тендеру (кешується, бо фільтри перераховуються часто)
   // Товари, які не цікавлять: позиції з ними не рахуються, а тендер лише з ними прихований
   var EXCL_ITEM = /рукавич|рукавиц|перчат|маск[аиоу]?([^а-яіїєґ]|$)|маски|масок|відріз\S*\s+марл|отрез\S*\s+марл|бахіл|бахил|шапочк|шапк|ковпак|колпак|берет|костюм|нарукавник|фартух|фартук|комбінезон|комбинезон|сорочк|рубашк|штани|брюки|одяг|одежд|джгут|жгут/;
-  // Системи для дренування не цікавлять (дренажі Блейк — окрема категорія, її лишаємо)
+  // Дренажі не цікавлять, крім Блейк (окрема категорія)
   // Ортопедичний інструмент (набори для еластичних стрижнів, направляючі дроти, остеосинтез) не цікавить
   var ORTHO = /еластичн\S*\s+(стрижн|стержн)|(стрижн|стержн)\S*\s+еластичн|(інтрамедулярн|інтрамедуллярн)\S*\s+(стрижн|стержн|цвях|гвозд)|направляюч\S*\s+дріт|направляющ\S*\s+проволок|остеосинтез|кіршнер|кишнер/;
   var DRAIN_SYS = /систем\S*\s+(для\s+)?дренув|систем\S*\s+дренаж|дренажн\S*\s+систем|дренувальн\S*\s+систем|drainage\s+system/;
@@ -133,14 +133,25 @@
   var CATH = /катетер|cathet|нелатон|nelaton|foley|(^|[^а-яіїєґ])фол{1,2}е(я|ї|ю|єм)(?=[^а-яіїєґ]|$)/;
   var REDON = /редон|redon/;
   var DRAPE_WORDS = /покритт|покрыти|простирадл|простын|плівк|пленк|драп|drape/;
+  // Марля в будь-якому вигляді (відрізи, серветки, бинти, тампони, кульки) не цікавить
+  var GAUZE = /марл|gauze/;
+  // Затискачі (кліпси, клеми) для пуповини не цікавлять
+  var CORD_WORD = /пуповин|пупков|пупов|umbilical/;
+  var CLAMP_WORD = /затиск|зажим|клем|кліпс|клипс|clamp|clip/;
   function excluded(d) {
+    if (GAUZE.test(d)) return true;
+    if (CORD_WORD.test(d) && CLAMP_WORD.test(d)) return true;
     if (EXCL_ITEM.test(d) && !/халат/.test(d)) return true;
     if (ORTHO.test(d) || EXCL_ITEM2.test(d)) return true;
-    if (DRAIN_SYS.test(d) && !/блейк|blake/.test(d)) return true;
-    if (/блейк|blake/.test(d) || DRAPE_WORDS.test(d)) return false;
+    // Дренажі: цікавлять лише Блейк. Усі інші (в тому числі металеві, з троакаром чи затискачем) не цікавлять.
+    var blake = /блейк|blake/.test(d);
+    if (DRAIN_SYS.test(d) && !blake) return true;
+    if (blake) return false;
+    if (DRAIN.test(d) && /метал/.test(d)) return true;
+    // виняток: покриття з дренажною кишенею чи пакетом (власні слова покриттів)
+    if (DRAPE_WORDS.test(d)) return false;
     if (CATH.test(d) || REDON.test(d)) return true;
-    // інші дренажі: лишаємо лише якщо поряд є власне інструмент (наприклад, затискач для дренажних трубок)
-    if (DRAIN.test(d) && !CAT_BY.instr.re.test(d.replace(DRAIN_G, ' '))) return true;
+    if (DRAIN.test(d)) return true;
     return false;
   }
   // Розбір позицій тендеру за категоріями (одна й та сама логіка в додатку й у скрипті вивантаження)
@@ -418,6 +429,42 @@
     var src = opts.starred ? ALL.filter(function (t) { return S.starred[t.id]; }) : ALL;
     return src.filter(function (t) { return pass(t, f, null, range); }).sort(sorter(f.sort));
   }
+  // ---------- Тендери конкретного переможця чи замовника ----------
+  // Беремо всі тендери 3314/3316 із додатка (період, суму й категорії з головної сторінки не застосовуємо),
+  // але те, що не цікавить (виключені товари, переговорні процедури), не показуємо.
+  function nameKey(s) { return norm(s).replace(/[«»"“”„]/g, '').replace(/\s+/g, ' ').trim(); }
+  function winnerKey(w) { return nameKey(w && w.n); }
+  function orgKey(t) { var e = String(t.edr || '').replace(/\D/g, ''); return e ? 'e:' + e : 'n:' + nameKey(t.org); }
+  function pick(test, opts) {
+    opts = opts || {};
+    return ALL.filter(function (t) {
+      if (hidden(t)) return false;
+      if (opts.mine && !info(t).catList.length) return false;
+      return test(t);
+    }).sort(sorter(opts.sort || 'new'));
+  }
+  function ofWinner(key, opts) { return pick(function (t) { return (t.win || []).some(function (w) { return w && w.n && winnerKey(w) === key; }); }, opts); }
+  function ofOrg(key, opts) { return pick(function (t) { return !!t.org && orgKey(t) === key; }, opts); }
+  // val: очікувана вартість тендерів (як у картках); won: суми переможних пропозицій (для переможця лише його, інакше всіх)
+  function totals(list, wKey) {
+    var val = {}, won = {}, noVal = 0, hasWon = false;
+    list.forEach(function (t) {
+      var cur = t.cur || 'UAH';
+      if (t.val == null || isNaN(t.val)) noVal++; else val[cur] = (val[cur] || 0) + t.val;
+      (t.win || []).forEach(function (w) {
+        if (!w || w.a == null || isNaN(w.a)) return;
+        if (wKey && winnerKey(w) !== wKey) return;
+        won[cur] = (won[cur] || 0) + w.a; hasWon = true;
+      });
+    });
+    return { val: val, won: won, hasWon: hasWon, noVal: noVal, count: list.length };
+  }
+  function fmtTotal(o) {
+    var ks = Object.keys(o || {}).sort(function (a, b) { return a === 'UAH' ? -1 : b === 'UAH' ? 1 : a < b ? -1 : 1; });
+    if (!ks.length) return '—';
+    return ks.map(function (k) { return fmtMoney(o[k], k); }).join(' + ');
+  }
+
   // Кількості для кожного значення фільтра з урахуванням решти фільтрів
   function facets(f, opts) {
     opts = opts || {}; f = f || S.f;
@@ -478,7 +525,7 @@
     get S() { return S; }, all: function () { return ALL; }, byId: function (id) { return BY[id]; },
     init: init, save: save, sync: sync, exportNow: exportNow, normUrl: normUrl, errText: errText, validUrl: validUrl, merge: merge, wipe: wipe,
     catsOfItem: catsOfItem, info: info, statusName: statusName, statusGroup: statusGroup, typeName: typeName, regionName: regionName, regionList: regionList, typeList: typeList,
-    query: query, facets: facets, setF: setF, resetF: resetF, activeCount: activeCount, periodRange: periodRange,
+    query: query, ofWinner: ofWinner, ofOrg: ofOrg, totals: totals, fmtTotal: fmtTotal, winnerKey: winnerKey, orgKey: orgKey, sorter: sorter, facets: facets, setF: setF, resetF: resetF, activeCount: activeCount, periodRange: periodRange,
     toggleStar: toggleStar, isNew: isNew, deadline: deadline, prozorroUrl: prozorroUrl,
     fmtDate: fmtDate, fmtMoney: fmtMoney, fmtQty: fmtQty, plural: plural, pubMs: pubMs, norm: norm
   };

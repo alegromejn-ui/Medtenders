@@ -236,3 +236,20 @@ label.fl{display:block;font-size:14px;font-weight:650;margin:18px 0 7px}
 .catsin legend small{font-weight:500;color:var(--muted);margin-left:6px}
 .catsin .cats{flex-wrap:wrap;overflow:visible;margin:8px 0 2px;padding:0}
 @media (min-width:980px){.catsin{display:none}}
+
+/* v22: тендери конкретного переможця чи замовника */
+.vtop{justify-content:flex-start;align-items:flex-start;gap:14px}
+.vhead{min-width:0;flex:1}
+.vhead h1{font-size:22px;line-height:1.2;overflow-wrap:anywhere}
+.vkind{margin:2px 0 4px;font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.vsum{background:var(--surface);border-radius:18px;padding:16px;box-shadow:inset 0 0 0 1px var(--line),var(--shadow)}
+.vsum-l{display:block;font-size:13px;color:var(--muted);font-weight:600}
+.vsum-n{display:block;font-size:30px;line-height:1.1;font-weight:800;letter-spacing:-.025em;margin-top:3px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.vsum dl{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--line)}
+.vsum dt{font-size:12.5px;color:var(--muted);font-weight:600}
+.vsum dd{margin:1px 0 0;font-weight:700;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.vbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:12px 0 4px}
+.lnk{display:inline;color:var(--accent);font-weight:700;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;text-align:left;padding:2px 0}
+.lnk svg{vertical-align:-3px;margin-left:2px}
+.wins .lnk svg{color:var(--accent);margin-top:0}
+@media (min-width:980px){.vhead h1{font-size:26px}}

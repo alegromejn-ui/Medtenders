@@ -3,7 +3,7 @@
   'use strict';
   var F = window.MT;
   var app = document.getElementById('app'), tabsEl = document.getElementById('tabs'), sheetRoot = document.getElementById('sheet-root'), toastEl = document.getElementById('toast');
-  var ui = { tab: 'list', shown: 60, sheet: null, busy: false, msg: null, urlMsg: null, syncErr: '' };
+  var ui = { tab: 'list', views: [], shown: 60, sheet: null, busy: false, msg: null, urlMsg: null, syncErr: '' };
   var STEP = 60;
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -29,6 +29,7 @@
   function render() {
     var h = '';
     if (ui.tab === 'settings') h = settingsPage();
+    else if (ui.views.length) h = viewPage();
     else h = listPage(ui.tab === 'star');
     app.innerHTML = h;
     app.className = ui.tab === 'settings' ? 'is-settings' : 'is-list';
@@ -152,6 +153,45 @@
     return h + '</div></div>';
   }
 
+  // ---------- Тендери переможця чи замовника ----------
+  function viewPage() {
+    var v = ui.views[ui.views.length - 1], isW = v.kind === 'winner';
+    var list = isW ? F.ofWinner(v.key, { sort: v.sort, mine: v.mine }) : F.ofOrg(v.key, { sort: v.sort, mine: v.mine });
+    var tot = F.totals(list, isW ? v.key : null);
+    var h = '<header class="top vtop"><button class="icon-btn" data-act="vback" aria-label="Назад">' + ic('left') + '</button>' +
+      '<div class="vhead"><p class="vkind">' + (isW ? 'Переможець' : 'Замовник') + '</p><h1>' + esc(v.name) + '</h1>' +
+      (v.edr ? '<p class="sync">ЄДРПОУ ' + esc(v.edr) + '</p>' : '') + '</div></header><div class="vmain">';
+    h += '<section class="vsum"><span class="vsum-l">Загальна сума тендерів на сторінці</span><b class="vsum-n">' + esc(F.fmtTotal(tot.val)) + '</b>' +
+      '<dl><div><dt>Тендерів</dt><dd>' + list.length + '</dd></div>' +
+      (tot.hasWon ? '<div><dt>' + (isW ? 'Переможні пропозиції контрагента' : 'Переможні пропозиції') + '</dt><dd>' + esc(F.fmtTotal(tot.won)) + '</dd></div>' : '') + '</dl>' +
+      (tot.noVal ? '<p class="fine">У ' + tot.noVal + ' ' + F.plural(tot.noVal, 'тендері', 'тендерах', 'тендерах') + ' суму не вказано, вони в загальну суму не входять.</p>' : '') +
+      '</section>';
+    h += '<div class="vbar"><div class="pills"><button data-act="vmine" aria-pressed="' + (!!v.mine) + '">Лише мої товари</button></div>' +
+      '<label class="sort"><span class="vh">Сортування</span><select data-vsort>' + SORTS.map(function (x) { return '<option value="' + x[0] + '"' + (v.sort === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select></label></div>';
+    if (!list.length) {
+      h += '<div class="empty"><p>' + (v.mine ? 'Тендерів з вашими товарами немає. Вимкніть «Лише мої товари», щоб побачити всі тендери 3314/3316.' : 'Тендерів 3314/3316 цього контрагента в додатку немає.') + '</p></div>';
+    } else {
+      h += '<div class="list">' + list.slice(0, ui.shown).map(card).join('') + '</div>';
+      if (list.length > ui.shown) h += '<button class="btn ghost block more" data-act="more">Показати ще ' + Math.min(STEP, list.length - ui.shown) + '</button>';
+    }
+    return h + '</div>';
+  }
+  function openView(kind, tid, wi) {
+    var t = F.byId(tid); if (!t) return;
+    var key, name, edr = '';
+    if (kind === 'winner') {
+      var w = (t.win || [])[wi]; if (!w || !w.n) return;
+      key = F.winnerKey(w); name = w.n;
+    } else {
+      if (!t.org) return;
+      key = F.orgKey(t); name = t.org; edr = t.edr || '';
+    }
+    var top = ui.views[ui.views.length - 1];
+    if (top && top.kind === kind && top.key === key) { ui.sheet = null; renderSheet(); return; }
+    ui.views.push({ kind: kind, key: key, name: name, edr: edr, from: tid, y: window.scrollY, sort: 'new', mine: false });
+    ui.sheet = null; ui.shown = STEP; renderSheet(); render(); window.scrollTo(0, 0);
+  }
+
   // ---------- Картка тендеру ----------
   function tenderSheet(t) {
     var i = F.info(t), dl = F.deadline(t), star = !!F.S.starred[t.id];
@@ -162,7 +202,7 @@
     h += '<h2 class="td-t">' + esc(t.t || 'Без назви') + '</h2>';
     h += '<button class="tid" data-act="copy" data-v="' + esc(t.tid) + '">' + esc(t.tid) + ic('copy', 'sm') + '</button>';
     h += '<dl class="facts">' +
-      '<div><dt>Замовник</dt><dd>' + esc(t.org) + (t.edr ? '<small>ЄДРПОУ ' + esc(t.edr) + '</small>' : '') + '</dd></div>' +
+      '<div><dt>Замовник</dt><dd>' + (t.org ? '<button class="lnk" data-act="org" data-id="' + esc(t.id) + '">' + esc(t.org) + ic('right', 'sm') + '</button>' : '') + (t.edr ? '<small>ЄДРПОУ ' + esc(t.edr) + '</small>' : '') + '</dd></div>' +
       '<div><dt>Регіон</dt><dd>' + esc(i.region) + (t.loc ? '<small>' + esc(t.loc) + '</small>' : '') + '</dd></div>' +
       '<div><dt>Очікувана вартість</dt><dd class="num">' + (t.val != null ? esc(F.fmtMoney(t.val, t.cur)) + '<small>' + (t.vat ? 'з ПДВ' : 'без ПДВ') + '</small>' : 'Не вказана') + '</dd></div>' +
       '<div><dt>Вид закупівлі</dt><dd>' + esc(F.typeName(t.pmt)) + '</dd></div>' +
@@ -185,9 +225,9 @@
       (t.other ? 'У тендері також ' + t.other + ' ' + F.plural(t.other, 'позиція', 'позиції', 'позицій') + ' з інших кодів ДК. ' : '') + 'Повний перелік є на ProZorro.</p>';
     if (t.win && t.win.length) {
       var lots = {}; (t.lots || []).forEach(function (l) { lots[l.id] = l.t; });
-      h += '<h3>Переможці</h3><ul class="wins">' + t.win.map(function (w) {
-        return '<li>' + ic('trophy', 'sm') + '<span><b>' + esc(w.n || 'Учасник') + '</b>' + (w.lot && lots[w.lot] ? '<small>' + esc(lots[w.lot]) + '</small>' : '') + '</span><span class="num">' + (w.a != null ? esc(F.fmtMoney(w.a, t.cur)) : '') + '</span></li>';
-      }).join('') + '</ul>';
+      h += '<h3>Переможці</h3><ul class="wins">' + t.win.map(function (w, wi) {
+        return '<li>' + ic('trophy', 'sm') + '<span>' + (w.n ? '<button class="lnk" data-act="winner" data-id="' + esc(t.id) + '" data-i="' + wi + '">' + esc(w.n) + ic('right', 'sm') + '</button>' : '<b>Учасник</b>') + (w.lot && lots[w.lot] ? '<small>' + esc(lots[w.lot]) + '</small>' : '') + '</span><span class="num">' + (w.a != null ? esc(F.fmtMoney(w.a, t.cur)) : '') + '</span></li>';
+      }).join('') + '</ul><p class="note">Натисніть на переможця чи замовника, щоб побачити всі його тендери 3314/3316.</p>';
     }
     h += '<a class="btn block go" href="' + esc(F.prozorroUrl(t)) + '" target="_blank" rel="noopener">Відкрити на ProZorro' + ic('ext', 'sm') + '</a>';
     return h + '</div>';
@@ -282,7 +322,7 @@
     var el = ev.target.closest('[data-act]'); if (!el) return;
     var a = el.getAttribute('data-act'), id = el.getAttribute('data-id');
     switch (a) {
-      case 'tab': ui.tab = el.getAttribute('data-tab'); ui.shown = STEP; ui.urlMsg = null; ui.urlDraft = null; ui.sheet = null; renderSheet(); render(); window.scrollTo(0, 0); break;
+      case 'tab': ui.tab = el.getAttribute('data-tab'); ui.views = []; ui.shown = STEP; ui.urlMsg = null; ui.urlDraft = null; ui.sheet = null; renderSheet(); render(); window.scrollTo(0, 0); break;
       case 'sync': doSync(false); break;
       case 'cat': {
         var c = el.getAttribute('data-cat'), cur = F.S.f.cats.slice();
@@ -296,6 +336,14 @@
       case 'filters': ui.sheet = 'filters'; renderSheet(); break;
       case 'more': ui.shown += STEP; render(); break;
       case 'open': ui.sheet = id; renderSheet(); break;
+      case 'winner': openView('winner', id, parseInt(el.getAttribute('data-i'), 10)); break;
+      case 'org': openView('org', id); break;
+      case 'vback': {
+        var pv = ui.views.pop(); ui.shown = STEP; render(); window.scrollTo(0, (pv && pv.y) || 0);
+        if (pv && pv.from && F.byId(pv.from)) { ui.sheet = pv.from; renderSheet(); }
+        break;
+      }
+      case 'vmine': { var cv = ui.views[ui.views.length - 1]; if (cv) { cv.mine = !cv.mine; ui.shown = STEP; render(); } break; }
       case 'close': ui.sheet = null; renderSheet(); break;
       case 'star': {
         var on = F.toggleStar(id); toast(on ? 'Додано в обрані' : 'Прибрано з обраних');
@@ -332,6 +380,8 @@
     }
   });
   document.addEventListener('change', function (ev) {
+    var vs = ev.target.closest('[data-vsort]');
+    if (vs) { var cv = ui.views[ui.views.length - 1]; if (cv) { cv.sort = vs.value; ui.shown = STEP; render(); } return; }
     var el = ev.target.closest('[data-change]'); if (!el) return;
     var k = el.getAttribute('data-change'), p = {}; p[k] = el.value; F.setF(p); rerenderList();
   });
