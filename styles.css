@@ -261,3 +261,26 @@ label.fl{display:block;font-size:14px;font-weight:650;margin:18px 0 7px}
 .ff fieldset,.catsin{min-width:0}
 .catsin .cat{max-width:100%;white-space:normal;text-align:left;line-height:1.25}
 .catsin .cat{padding-top:5px;padding-bottom:5px}
+
+/* Перший запуск: встановлення на головний екран */
+.prog{display:flex;gap:6px;list-style:none;margin:0 0 14px;padding:0}
+.prog li{flex:1 1 0;min-width:0;border-top:4px solid var(--line);padding-top:6px;font-size:13px;font-weight:650;color:var(--muted)}
+.prog li.on{border-color:var(--accent);color:var(--ink)}
+.prog li.done{border-color:var(--accent);color:var(--accent)}
+.pills.os{margin:0 0 14px}
+.steps.big{padding-left:24px}
+.steps.big li{margin:0 0 14px;line-height:1.55}
+.tap{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:9px;background:var(--raised);font-weight:650;white-space:nowrap;vertical-align:middle}
+.btn.inl{margin:0 4px 6px 0;vertical-align:middle}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--soon-soft);margin:0 0 14px;font-size:14.5px;line-height:1.45}
+.callout>svg{margin-top:2px;color:var(--soon)}
+.callout .btns{margin-top:10px}
+.btns.end{margin:4px 0 0}
+details.fold{padding:0}
+details.fold>summary{cursor:pointer;list-style:none;padding:16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:10px}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::after{content:'+';font-size:20px;line-height:1;color:var(--muted)}
+details.fold[open]>summary::after{content:'−'}
+details.fold>.steps,details.fold>.fine{margin-left:16px;margin-right:16px}
+details.fold>.steps{padding-left:22px}
+details.fold>.fine{margin-bottom:16px}

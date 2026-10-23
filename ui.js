@@ -6,6 +6,100 @@
   var ui = { tab: 'list', views: [], shown: 60, sheet: null, busy: false, msg: null, urlMsg: null, syncErr: '' };
   var STEP = 60;
 
+  // ---------- Перший запуск: встановлення на головний екран, потім підключення даних ----------
+  var ONB_KEY = 'medtender-skip-install';
+  var UA = navigator.userAgent || '';
+  var IS_IOS = /iPad|iPhone|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var IS_ANDROID = /Android/i.test(UA);
+  // iOS: лише справжній Safari вміє додати на головний екран; Chrome, Firefox і браузери в месенджерах — ні (або кроки інші)
+  var IOS_NOT_SAFARI = IS_IOS && (!/Safari\//.test(UA) || /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(UA));
+  var ANDROID_WEBVIEW = IS_ANDROID && /; wv\)/.test(UA);
+  ui.os = IS_IOS ? 'ios' : IS_ANDROID ? 'android' : 'pc';
+  try { ui.skipInstall = window.localStorage.getItem(ONB_KEY) === '1'; } catch (e) { ui.skipInstall = false; }
+  var deferredPrompt = null;
+  function standalone() {
+    try { if (window.navigator.standalone === true) return true; } catch (e) { /* ignore */ }
+    return !!(window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: minimal-ui)').matches));
+  }
+  function onboarding() { return !F.S.url && !F.all().length; }
+  function installStage() { return !standalone() && !ui.skipInstall; }
+  function siteLink() { return location.origin + location.pathname; }
+  function tap(icon, label) { return '<span class="tap">' + (icon ? ic(icon, 'sm') : '') + esc(label) + '</span>'; }
+
+  function installGuide() {
+    var os = ui.os, h = '';
+    if (IOS_NOT_SAFARI || ANDROID_WEBVIEW) {
+      h += '<div class="callout">' + ic('alert', 'sm') + '<div><b>' + (IS_IOS ? 'Схоже, сайт відкрито не в Safari.' : 'Схоже, сайт відкрито у вбудованому браузері.') + '</b> ' +
+        (IS_IOS ? 'Скопіюйте посилання, відкрийте Safari й вставте його в адресний рядок.' : 'Скопіюйте посилання й відкрийте його в Chrome.') +
+        '<div class="btns"><button class="btn sm" data-act="copy-link">' + ic('copy', 'sm') + 'Скопіювати посилання</button></div></div></div>';
+    }
+    h += '<div class="pills os" role="group" aria-label="Пристрій">' + [['ios', 'iPhone / iPad'], ['android', 'Android'], ['pc', 'Комп’ютер']].map(function (x) {
+      return '<button data-act="os" data-v="' + x[0] + '" aria-pressed="' + (os === x[0]) + '">' + x[1] + '</button>';
+    }).join('') + '</div>';
+    if (os === 'ios') {
+      h += '<ol class="steps big">' +
+        '<li>Відкрийте цей сайт у <b>Safari</b>. У Chrome чи в браузері всередині месенджера (Telegram, Viber) кроки інші, тому краще Safari.</li>' +
+        '<li>Натисніть ' + tap('share', 'Поділитися') + ' (квадрат зі стрілкою вгору). Якщо цієї кнопки не видно, спершу натисніть ' + tap('more', '') + ' біля адресного рядка.</li>' +
+        '<li>Прокрутіть список і виберіть ' + tap('addsq', 'На початковий екран') + ' (англійською «Add to Home Screen»).</li>' +
+        '<li>Якщо є перемикач «Відкривати як веб-додаток», залиште його ввімкненим. Натисніть «Додати».</li>' +
+        '<li>Закрийте Safari й відкрийте <b>Медтендери</b> з іконки на головному екрані. Крок 2 виконуйте вже в ній: дані в іконці зберігаються окремо від Safari.</li></ol>';
+    } else if (os === 'android') {
+      h += '<ol class="steps big">' +
+        '<li>Відкрийте цей сайт у <b>Chrome</b> (не у вбудованому браузері месенджера).</li>' +
+        '<li>' + (deferredPrompt ? '<button class="btn sm inl" data-act="install-now">' + ic('addsq', 'sm') + 'Встановити додаток</button> Або натисніть ' : 'Натисніть ') + tap('dots', 'Меню') +
+        ' угорі праворуч і виберіть «Встановити додаток» (на деяких телефонах: «Додати на головний екран»).</li>' +
+        '<li>Підтвердьте «Встановити». Іконка <b>Медтендери</b> з’явиться на головному екрані або в списку додатків.</li>' +
+        '<li>Відкрийте додаток з іконки. Крок 2 виконуйте вже в ньому.</li></ol>';
+    } else {
+      h += '<ol class="steps big">' +
+        '<li>Відкрийте сайт у Chrome або Edge.</li>' +
+        '<li>У правій частині адресного рядка натисніть ' + tap('install', 'Встановити') + '. Якщо значка немає: меню ⋮ → «Зберегти й поділитися» → «Встановити як додаток». Назви пунктів можуть трохи відрізнятися.</li>' +
+        '<li>У Safari на Mac: меню «Файл» → «Додати до Dock».</li>' +
+        '<li>Додаток відкриється в окремому вікні. На комп’ютері це необов’язково: можна працювати й у вкладці браузера.</li></ol>';
+    }
+    return h;
+  }
+
+  function urlForm(label) {
+    var S = F.S;
+    var h = '<form class="urlrow" data-form="url"><input type="text" id="url" name="url" value="' + esc(ui.urlDraft != null ? ui.urlDraft : S.url) + '" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="URL скрипта">' +
+      '<button class="btn" type="submit"' + (ui.busy ? ' disabled' : '') + '>' + label + '</button></form>';
+    if (ui.urlMsg) h += '<p class="msg ' + (ui.urlMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.urlMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.urlMsg.text) + '</p>';
+    return h;
+  }
+  function adminSteps() {
+    return '<ol class="steps">' +
+      '<li>Створіть нову Google Таблицю: відкрийте <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> і назвіть її, наприклад, «Медтендери».</li>' +
+      '<li>Меню «Розширення» → «Apps Script». Видаліть увесь код і вставте вміст файлу <b>medtender.gs</b>. Збережіть.</li>' +
+      '<li>Угорі виберіть функцію <b>setup</b> і натисніть «Виконати». Дозвольте доступ: «Додатково» → «Перейти до проєкту». Скрипт створить аркуші й почне збирати тендери кожні 10 хвилин.</li>' +
+      '<li>«Розгорнути» → «Нове розгортання» → тип «Веб-додаток». Виконувати від імені: «Я», доступ: «Усі». Скопіюйте «URL веб-додатка» і вставте його вище.</li>' +
+      '</ol><p class="fine">Перший збір охоплює 2 останні дні й займає до години. Далі список росте сам, а все зібране лишається в таблиці. Тендери збираються навіть тоді, коли додаток закритий.</p>';
+  }
+  function progress(stage) {
+    return '<ol class="prog" aria-label="Етапи налаштування">' +
+      '<li class="' + (stage === 1 ? 'on' : 'done') + '"' + (stage === 1 ? ' aria-current="step"' : '') + '><span>1. Додаток на головному екрані</span></li>' +
+      '<li class="' + (stage === 2 ? 'on' : '') + '"' + (stage === 2 ? ' aria-current="step"' : '') + '><span>2. Підключення даних</span></li></ol>';
+  }
+  function onboardPage() {
+    var mobile = IS_IOS || IS_ANDROID, h;
+    if (installStage()) {
+      h = '<header class="top"><div><h1>Встановіть додаток</h1><p class="sync">Так він відкриватиметься з іконки, як звичайна програма, і працюватиме без інтернету.</p></div></header><div class="narrow">' +
+        progress(1) + '<section class="panel">' + installGuide() + '</section>';
+      if (ui.installed) h += '<p class="msg ok">' + ic('check', 'sm') + 'Додаток встановлено. Відкрийте його з іконки й перейдіть до кроку 2.</p>';
+      if (mobile) h += '<div class="btns end"><button class="btn ghost sm" data-act="skip-install">Пропустити, працюватиму в браузері</button></div>' +
+        '<p class="fine">Дані зберігаються окремо в іконці й окремо в браузері. Якщо підключите скрипт у браузері, а потім встановите додаток, підключення доведеться повторити в додатку.</p>';
+      else h += '<div class="btns end"><button class="btn" data-act="skip-install">Далі: підключення даних</button></div>';
+      return h + '</div>';
+    }
+    h = '<header class="top"><div><h1>Підключіть дані</h1><p class="sync">' + (standalone() ? 'Додаток встановлено. Лишився один крок.' : 'Лишився один крок.') + '</p></div></header><div class="narrow">' +
+      progress(2) +
+      '<section class="panel"><h2>Адреса скрипта</h2><p class="sub">Її надає адміністратор: посилання, що починається з https://script.google.com/ і закінчується на /exec. Скопіюйте його з повідомлення й вставте нижче.</p>' +
+      urlForm('Підключити') + '</section>' +
+      '<details class="panel fold"><summary>Я адміністратор: як створити скрипт</summary>' + adminSteps() + '</details>';
+    if (!standalone()) h += '<div class="btns"><button class="btn ghost sm" data-act="show-install">Показати, як встановити додаток</button></div>';
+    return h + '</div>';
+  }
+
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function ic(n, cls) { return '<svg class="ic' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; }
   function toast(t) { toastEl.textContent = t; toastEl.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(function () { toastEl.classList.remove('on'); }, 2600); }
@@ -27,16 +121,18 @@
 
   // ---------- Каркас ----------
   function render() {
-    var h = '';
-    if (ui.tab === 'settings') h = settingsPage();
+    var h = '', onb = onboarding();
+    if (onb) h = onboardPage();
+    else if (ui.tab === 'settings') h = settingsPage();
     else if (ui.views.length) h = viewPage();
     else h = listPage(ui.tab === 'star');
     // Колонка фільтрів зліва (на широкому екрані) малюється заново разом зі списком: не даємо їй стрибати вгору
     var side = app.querySelector('.side'), sideTop = side ? side.scrollTop : 0;
     app.innerHTML = h;
-    app.className = ui.tab === 'settings' ? 'is-settings' : 'is-list';
+    app.className = onb || ui.tab === 'settings' ? 'is-settings' : 'is-list';
+    tabsEl.style.display = onb ? 'none' : '';
     if (sideTop) { var side2 = app.querySelector('.side'); if (side2) side2.scrollTop = sideTop; }
-    renderTabs();
+    if (!onb) renderTabs();
   }
   function renderTabs() {
     var n = Object.keys(F.S.starred).length;
@@ -262,10 +358,8 @@
   function settingsPage() {
     var S = F.S, sv = S.server;
     var h = '<header class="top"><div><h1>Налаштування</h1></div></header><div class="narrow">';
-    h += '<section class="panel"><h2>Google-скрипт</h2><p class="sub">Вставте «URL веб-додатка», який Google показав після розгортання скрипта.</p>' +
-      '<form class="urlrow" data-form="url"><input type="text" id="url" name="url" value="' + esc(ui.urlDraft != null ? ui.urlDraft : S.url) + '" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="URL скрипта">' +
-      '<button class="btn" type="submit"' + (ui.busy ? ' disabled' : '') + '>' + (S.url ? 'Зберегти' : 'Підключити') + '</button></form>';
-    if (ui.urlMsg) h += '<p class="msg ' + (ui.urlMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.urlMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.urlMsg.text) + '</p>';
+    h += '<section class="panel"><h2>Google-скрипт</h2><p class="sub">Вставте «URL веб-додатка», який Google показав після розгортання скрипта (або який надав адміністратор).</p>' +
+      urlForm(S.url ? 'Зберегти' : 'Підключити');
     if (S.url) {
       h += '<dl class="stat">' +
         '<div><dt>У додатку</dt><dd>' + F.all().length + ' ' + F.plural(F.all().length, 'тендер', 'тендери', 'тендерів') + '</dd></div>' +
@@ -297,12 +391,8 @@
       }
       h += '</section>';
     }
-    h += '<section class="panel"><h2>Як встановити скрипт</h2><ol class="steps">' +
-      '<li>Створіть нову Google Таблицю: відкрийте <a href="https://sheets.new" target="_blank" rel="noopener">sheets.new</a> і назвіть її, наприклад, «Медтендери».</li>' +
-      '<li>Меню «Розширення» → «Apps Script». Видаліть увесь код і вставте вміст файлу <b>medtender.gs</b>. Збережіть.</li>' +
-      '<li>Угорі виберіть функцію <b>setup</b> і натисніть «Виконати». Дозвольте доступ: «Додатково» → «Перейти до проєкту». Скрипт створить аркуші й почне збирати тендери кожні 10 хвилин.</li>' +
-      '<li>«Розгорнути» → «Нове розгортання» → тип «Веб-додаток». Виконувати від імені: «Я», доступ: «Усі». Скопіюйте «URL веб-додатка» і вставте його вище.</li>' +
-      '</ol><p class="fine">Перший збір охоплює 2 останні дні й займає до години. Далі список росте сам, а все зібране лишається в таблиці. Тендери збираються навіть тоді, коли додаток закритий.</p></section>';
+    h += '<section class="panel"><h2>Як встановити скрипт</h2>' + adminSteps() + '</section>';
+    if (!standalone()) h += '<section class="panel"><h2>Додаток на головному екрані</h2>' + installGuide() + '</section>';
     h += '<section class="panel"><h2>Додаток</h2><div class="btns"><button class="btn ghost sm" data-act="hardupd">' + ic('refresh', 'sm') + 'Оновити додаток</button>' +
       '<button class="btn ghost sm danger" data-act="wipe">Стерти тендери з телефону</button></div>' +
       '<p class="fine">«Стерти» прибирає лише копію в цьому телефоні: таблиця Google не зміниться, і при наступному оновленні список завантажиться наново. Обрані лишаються.</p>' +
@@ -332,6 +422,20 @@
     switch (a) {
       case 'tab': ui.tab = el.getAttribute('data-tab'); ui.views = []; ui.shown = STEP; ui.urlMsg = null; ui.urlDraft = null; ui.sheet = null; renderSheet(); render(); window.scrollTo(0, 0); break;
       case 'sync': doSync(false); break;
+      case 'os': ui.os = el.getAttribute('data-v'); render(); break;
+      case 'skip-install': ui.skipInstall = true; try { window.localStorage.setItem(ONB_KEY, '1'); } catch (e) { /* ignore */ } render(); window.scrollTo(0, 0); break;
+      case 'show-install': ui.skipInstall = false; try { window.localStorage.removeItem(ONB_KEY); } catch (e) { /* ignore */ } render(); window.scrollTo(0, 0); break;
+      case 'install-now':
+        if (!deferredPrompt) break;
+        deferredPrompt.prompt();
+        if (deferredPrompt.userChoice && deferredPrompt.userChoice.then) deferredPrompt.userChoice.then(function (r) { if (r && r.outcome === 'accepted') { ui.installed = true; } deferredPrompt = null; render(); }, function () { deferredPrompt = null; render(); });
+        break;
+      case 'copy-link': {
+        var link = siteLink();
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(function () { toast('Посилання скопійовано'); }, function () { toast(link); });
+        else toast(link);
+        break;
+      }
       case 'cat': {
         var c = el.getAttribute('data-cat'), cur = F.S.f.cats.slice();
         if (!c) cur = []; else if (cur.indexOf(c) >= 0) cur.splice(cur.indexOf(c), 1); else cur.push(c);
@@ -409,11 +513,13 @@
     var url = F.normUrl(form.querySelector('#url').value);
     ui.urlDraft = url;
     if (!F.validUrl(url)) { ui.urlMsg = { ok: false, text: F.errText({ code: 'NO_URL' }) }; render(); return; }
+    var wasOnb = onboarding();
     ui.busy = true; ui.urlMsg = { ok: true, text: 'Перевіряю…' }; render();
     F.sync({ url: url }).then(function (r) {
       ui.busy = false; ui.syncErr = ''; ui.urlDraft = null;
       ui.urlMsg = { ok: true, text: 'Підключено. Отримано тендерів: ' + (r.added + r.updated) + '.' + (r.added + r.updated ? '' : ' Скрипт ще збирає перші дані, загляньте за пів години.') };
       render();
+      if (wasOnb) toast('Підключено. Отримано тендерів: ' + (r.added + r.updated));
     }, function (e) { ui.busy = false; ui.urlMsg = { ok: false, text: F.errText(e) }; render(); });
   });
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && ui.sheet) { ui.sheet = null; renderSheet(); } });
@@ -421,6 +527,8 @@
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (F.S.lastSync || 0) > 5 * 60e3) doSync(true); });
   setInterval(function () { if (document.visibilityState === 'visible') doSync(true); }, 10 * 60e3);
 
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferredPrompt = e; if (onboarding() || ui.tab === 'settings') render(); });
+  window.addEventListener('appinstalled', function () { deferredPrompt = null; ui.installed = true; render(); });
   F.init().then(function () {
     render();
     if (F.S.url) doSync(true);
