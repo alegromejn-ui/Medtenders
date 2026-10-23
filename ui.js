@@ -31,8 +31,11 @@
     if (ui.tab === 'settings') h = settingsPage();
     else if (ui.views.length) h = viewPage();
     else h = listPage(ui.tab === 'star');
+    // Колонка фільтрів зліва (на широкому екрані) малюється заново разом зі списком: не даємо їй стрибати вгору
+    var side = app.querySelector('.side'), sideTop = side ? side.scrollTop : 0;
     app.innerHTML = h;
     app.className = ui.tab === 'settings' ? 'is-settings' : 'is-list';
+    if (sideTop) { var side2 = app.querySelector('.side'); if (side2) side2.scrollTop = sideTop; }
     renderTabs();
   }
   function renderTabs() {
@@ -239,10 +242,15 @@
       filterForm(fc, 's') + '<button class="btn block show" data-act="close">Показати ' + n + ' ' + F.plural(n, 'тендер', 'тендери', 'тендерів') + '</button>';
   }
   function renderSheet() {
-    if (!ui.sheet) { sheetRoot.innerHTML = ''; document.body.classList.remove('locked'); return; }
+    if (!ui.sheet) { sheetRoot.innerHTML = ''; ui.sheetKind = null; document.body.classList.remove('locked'); return; }
     var inner = '';
     if (ui.sheet === 'filters') inner = filtersSheet();
     else { var t = F.byId(ui.sheet); if (!t) { ui.sheet = null; return renderSheet(); } inner = tenderSheet(t); }
+    // Та сама шторка вже відкрита (змінили фільтр, додали в обрані…): оновлюємо вміст на місці, без нового малювання й анімації,
+    // тож прокрутка лишається там, де була, і шторка не смикається
+    var cur = sheetRoot.querySelector('.sheet');
+    if (cur && ui.sheetKind === ui.sheet) { var t0 = cur.scrollTop; cur.innerHTML = inner; cur.scrollTop = t0; ui.sheetSame = false; document.body.classList.add('locked'); return; }
+    ui.sheetKind = ui.sheet;
     var keep = sheetRoot.querySelector('.sheet'); var top = keep ? keep.scrollTop : 0;
     sheetRoot.innerHTML = '<div class="scrim" data-act="close"></div><div class="sheet ' + (ui.sheet === 'filters' ? 'fs' : 'ts') + '" role="dialog" aria-modal="true" aria-label="' + (ui.sheet === 'filters' ? 'Фільтри' : 'Тендер') + '">' + inner + '</div>';
     if (keep && ui.sheetSame) sheetRoot.querySelector('.sheet').scrollTop = top;
