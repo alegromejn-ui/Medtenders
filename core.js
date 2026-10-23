@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v27';
+  var VERSION = 'v28';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
@@ -374,22 +374,33 @@
   }
   // Вивантаження в Google-таблицю: скрипт сам виконує роботу, додаток лише просить запустити її зараз
   var exporting = null;
+  var BUSY_TRIES = 3, BUSY_WAIT_MS = 15000;   // скрипт зайнятий (іде збір): чекаємо й повторюємо самі, до трьох разів
   function exportNow() {
     if (exporting) return exporting;
     var url = normUrl(S.url);
     if (!validUrl(url)) return Promise.reject(err('NO_URL'));
     var u = url + '?action=export&key=' + encodeURIComponent(S.key || '');
-    exporting = api.fetch(u, { redirect: 'follow', cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw err('HTTP', r.status);
-      return r.json().catch(function () { throw err('NOT_JSON'); });
-    }, function () { throw err('NETWORK'); }).then(function (j) {
-      if (!j || j.app !== 'medtender') throw err('NOT_OURS');
-      if (j.tenders) throw err('OLD_SCRIPT');
-      if (!j.ok && (j.error === 'NO_KEY' || j.error === 'BAD_KEY' || j.error === 'NO_SERVER_KEY')) throw err(j.error, j.message);
-      if (!j.ok) throw err('EXPORT', j.message || j.error);
+    var tries = 0;
+    function once() {
+      return api.fetch(u, { redirect: 'follow', cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw err('HTTP', r.status);
+        return r.json().catch(function () { throw err('NOT_JSON'); });
+      }, function () { throw err('NETWORK'); }).then(function (j) {
+        if (!j || j.app !== 'medtender') throw err('NOT_OURS');
+        if (j.tenders) throw err('OLD_SCRIPT');
+        if (!j.ok && j.error === 'BUSY') {
+          if (tries++ < BUSY_TRIES) return new Promise(function (res) { setTimeout(res, BUSY_WAIT_MS); }).then(once);
+          throw err('BUSY', j.message);
+        }
+        if (!j.ok && (j.error === 'NO_KEY' || j.error === 'BAD_KEY' || j.error === 'NO_SERVER_KEY')) throw err(j.error, j.message);
+        if (!j.ok) throw err('EXPORT', j.message || j.error);
+        return j;
+      });
+    }
+    exporting = once().then(function (j) {
       S.exp = Object.assign({}, S.exp || {}, { on: true, at: Date.now(), added: j.added || 0, winners: j.winners || 0, err: '' }); save();
       exporting = null; return j;
-    }).then(function (j) { return j; }, function (e) { exporting = null; throw e; });
+    }, function (e) { exporting = null; throw e; });
     return exporting;
   }
   function errText(e) {
@@ -403,6 +414,7 @@
     if (c === 'NOT_OURS') return 'За цим URL працює інший скрипт. Потрібен URL розгортання скрипта Медтендерів.';
     if (c === 'OLD_SCRIPT') return 'У Google стоїть стара версія скрипта. Вставте новий medtender.gs, збережіть і створіть нову версію розгортання («Розгорнути» → «Керувати розгортаннями» → олівець → «Нова версія»).';
     if (c === 'NO_KEY' || c === 'BAD_KEY' || c === 'NO_SERVER_KEY') return String(e.detail || 'Ключ не підійшов.').slice(0, 300);
+    if (c === 'BUSY') return 'Скрипт зайнятий (іде збір тендерів). Я чекав кілька хвилин. Спробуйте ще раз за 5–10 хвилин.';
     if (c === 'EXPORT') return String(e.detail || 'Вивантаження не вдалося.').slice(0, 300);
     if (c === 'SERVER') return 'Скрипт повернув помилку' + (e.detail ? ': ' + String(e.detail).slice(0, 140) : '') + '.';
     return 'Не вдалося оновити: ' + (e && e.message ? e.message : e);
