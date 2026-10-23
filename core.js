@@ -267,7 +267,7 @@
   // ---------- Стан ----------
   var DEF_F = { cats: [], period: '30', from: '', to: '', region: '', type: '', status: '', min: '30000', sort: 'new', q: '' };
   var MIN_OPTS = [['', 'Будь-яка сума'], ['30000', 'Понад 30 000 ₴'], ['100000', 'Понад 100 000 ₴'], ['500000', 'Понад 500 000 ₴'], ['1000000', 'Понад 1 000 000 ₴']];
-  function defaults() { return { url: '', since: '', lastSync: 0, prevOpen: 0, lastOpen: 0, server: null, starred: {}, f: JSON.parse(JSON.stringify(DEF_F)) }; }
+  function defaults() { return { url: '', key: '', since: '', lastSync: 0, prevOpen: 0, lastOpen: 0, server: null, starred: {}, f: JSON.parse(JSON.stringify(DEF_F)) }; }
   var S = defaults();
   var ALL = [];            // тендери в пам’яті
   var BY = {};
@@ -378,13 +378,14 @@
     if (exporting) return exporting;
     var url = normUrl(S.url);
     if (!validUrl(url)) return Promise.reject(err('NO_URL'));
-    var u = url + '?action=export';
+    var u = url + '?action=export&key=' + encodeURIComponent(S.key || '');
     exporting = api.fetch(u, { redirect: 'follow', cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw err('HTTP', r.status);
       return r.json().catch(function () { throw err('NOT_JSON'); });
     }, function () { throw err('NETWORK'); }).then(function (j) {
       if (!j || j.app !== 'medtender') throw err('NOT_OURS');
       if (j.tenders) throw err('OLD_SCRIPT');
+      if (!j.ok && (j.error === 'NO_KEY' || j.error === 'BAD_KEY' || j.error === 'NO_SERVER_KEY')) throw err(j.error, j.message);
       if (!j.ok) throw err('EXPORT', j.message || j.error);
       S.exp = Object.assign({}, S.exp || {}, { on: true, at: Date.now(), added: j.added || 0, winners: j.winners || 0, err: '' }); save();
       exporting = null; return j;
@@ -401,6 +402,7 @@
     if (c === 'NOT_JSON') return 'За цим URL відкривається не скрипт Медтендерів. Перевірте, що скопіювали «URL веб-додатка» і доступ «Усі».';
     if (c === 'NOT_OURS') return 'За цим URL працює інший скрипт. Потрібен URL розгортання скрипта Медтендерів.';
     if (c === 'OLD_SCRIPT') return 'У Google стоїть стара версія скрипта. Вставте новий medtender.gs, збережіть і створіть нову версію розгортання («Розгорнути» → «Керувати розгортаннями» → олівець → «Нова версія»).';
+    if (c === 'NO_KEY' || c === 'BAD_KEY' || c === 'NO_SERVER_KEY') return String(e.detail || 'Ключ не підійшов.').slice(0, 300);
     if (c === 'EXPORT') return String(e.detail || 'Вивантаження не вдалося.').slice(0, 300);
     if (c === 'SERVER') return 'Скрипт повернув помилку' + (e.detail ? ': ' + String(e.detail).slice(0, 140) : '') + '.';
     return 'Не вдалося оновити: ' + (e && e.message ? e.message : e);
@@ -548,7 +550,7 @@
   }
   function prozorroUrl(t) { return 'https://prozorro.gov.ua/tender/' + encodeURIComponent(t.tid || t.id); }
 
-  function wipe() { ALL = []; BY = {}; var url = S.url, starred = S.starred; S = defaults(); S.url = url; S.starred = starred; save(); return dbClear(); }
+  function wipe() { ALL = []; BY = {}; var url = S.url, key = S.key, starred = S.starred; S = defaults(); S.url = url; S.key = key; S.starred = starred; save(); return dbClear(); }
 
   var api = {
     VERSION: VERSION, MIN_OPTS: MIN_OPTS, DEF_MIN: DEF_F.min, CATS: CATS, CAT_BY: CAT_BY, OTHER: OTHER, GROUPS: GROUPS, TYPES: TYPES,

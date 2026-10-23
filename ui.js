@@ -33,6 +33,13 @@
     if (ui.urlMsg) h += '<p class="msg ' + (ui.urlMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.urlMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.urlMsg.text) + '</p>';
     return h;
   }
+  function keyForm() {
+    var S = F.S;
+    var h = '<form class="urlrow" data-form="key"><input type="password" id="key" name="key" value="' + esc(ui.keyDraft != null ? ui.keyDraft : (S.key || '')) + '" placeholder="Ключ для вивантаження" autocomplete="off" autocapitalize="none" spellcheck="false" aria-label="Ключ для вивантаження">' +
+      '<button class="btn" type="submit">Зберегти ключ</button></form>';
+    if (ui.keyMsg) h += '<p class="msg ' + (ui.keyMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.keyMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.keyMsg.text) + '</p>';
+    return h;
+  }
   function progress(stage) {
     return '<ol class="prog" aria-label="Етапи налаштування">' +
       '<li class="' + (stage === 1 ? 'on' : 'done') + '"' + (stage === 1 ? ' aria-current="step"' : '') + '><span>1. Додаток на телефоні</span></li>' +
@@ -338,7 +345,9 @@
           '<div><dt>Дописано переможців</dt><dd>' + (ex.winners || 0) + '</dd></div></dl>';
         if (ex.err) h += '<p class="msg bad">' + ic('alert', 'sm') + esc(ex.err) + '</p>';
         if (ui.expMsg) h += '<p class="msg ' + (ui.expMsg.ok ? 'ok' : 'bad') + '">' + ic(ui.expMsg.ok ? 'check' : 'alert', 'sm') + esc(ui.expMsg.text) + '</p>';
-        h += '<div class="btns"><button class="btn sm" data-act="export"' + (ui.exporting ? ' disabled' : '') + '>' + ic('refresh', ui.exporting ? 'spin' : 'sm') + (ui.exporting ? 'Вивантажую…' : 'Вивантажити зараз') + '</button></div>' +
+        h += keyForm();
+        if (ex.key === false) h += '<p class="msg bad">' + ic('alert', 'sm') + 'У скрипті ще немає ключа: запустіть у редакторі функцію makeKey і скопіюйте ключ із журналу сюди.</p>';
+        h += '<div class="btns"><button class="btn sm" data-act="export"' + (ui.exporting || !S.key ? ' disabled' : '') + '>' + ic('refresh', ui.exporting ? 'spin' : 'sm') + (ui.exporting ? 'Вивантажую…' : 'Вивантажити зараз') + '</button></div>' +
           '<p class="fine">Кнопка додає все, що з’явилося після попереднього вивантаження, і нічого не дублює. Рядки, які ви вже внесли, скрипт не змінює: лише дописує переможця в порожню клітинку.</p>';
       }
       h += '</section>';
@@ -447,6 +456,14 @@
     }, 250);
   });
   document.addEventListener('submit', function (ev) {
+    var kf = ev.target.closest('[data-form="key"]');
+    if (kf) {
+      ev.preventDefault();
+      var k = String(kf.querySelector('#key').value || '').replace(/\s+/g, '');
+      F.S.key = k; F.save(); ui.keyDraft = null;
+      ui.keyMsg = k ? { ok: true, text: 'Ключ збережено на цьому телефоні.' } : { ok: false, text: 'Ключ порожній, вивантаження вимкнено.' };
+      ui.expMsg = null; render(); return;
+    }
     var form = ev.target.closest('[data-form="url"]'); if (!form) return;
     ev.preventDefault();
     var url = F.normUrl(form.querySelector('#url').value);
