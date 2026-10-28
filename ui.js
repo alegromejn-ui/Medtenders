@@ -330,7 +330,10 @@
       }
       h += '</dl>';
       if (sv && sv.lastError) h += '<p class="msg bad">' + ic('alert', 'sm') + 'Остання помилка скрипта: ' + esc(sv.lastError) + '</p>';
-      if (sv && sv.lastRun && Date.now() - sv.lastRun > 3 * 3600e3) h += '<p class="msg bad">' + ic('alert', 'sm') + 'Скрипт не запускався понад 3 години. Відкрийте Apps Script → Тригери й перевірте, що є тригер «sync» кожні 10 хвилин.</p>';
+      // Статус скрипта лежить у кеші з минулого відкриття: порівнюємо не з «зараз», а з моментом,
+      // коли додаток його отримав, і лише якщо цей статус свіжий (щойно оновлений, не під час завантаження).
+      var svFresh = !ui.busy && S.lastSync && Date.now() - S.lastSync < 15 * 60e3;
+      if (sv && sv.lastRun && svFresh && S.lastSync - sv.lastRun > 3 * 3600e3) h +='<p class="msg bad">' + ic('alert', 'sm') + 'Скрипт не запускався понад 3 години. Відкрийте Apps Script → Тригери й перевірте, що є тригер «sync» кожні 10 хвилин.</p>';
     }
     h += '</section>';
     if (S.url) {

@@ -2,7 +2,7 @@
    додаток лише завантажує готовий список, зберігає його в телефоні й фільтрує. */
 (function (root) {
   'use strict';
-  var VERSION = 'v28';
+  var VERSION = 'v29';
   var KEY = 'mt_state_v1';
   var PAGE = 1500;
 
