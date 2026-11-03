@@ -1,8 +1,8 @@
 /* Сервісний воркер: каркас додатка відкривається без інтернету.
    Сторінка береться з мережі (щоб приходили оновлення), а коли мережі немає, з кешу.
    Запити до Google-скрипта не кешуються: тендери зберігає сам додаток. */
-const VERSION = 'medtender-v31';
-const SHELL = ['./', 'index.html', 'styles.css', 'core.js', 'ui.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
+const VERSION = 'medtender-v32';
+const SHELL = ['./', 'index.html', 'styles.css', 'core.js', 'ui.js', 'manifest.json', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'icon-maskable-512.png',
   'fonts/onest-cyrillic-ext-wght-normal.woff2', 'fonts/onest-cyrillic-wght-normal.woff2', 'fonts/onest-latin-ext-wght-normal.woff2', 'fonts/onest-latin-wght-normal.woff2'];
 
 self.addEventListener('install', e => {
@@ -16,19 +16,22 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (req.mode === 'navigate') {
-    e.respondWith(navigate(req));
-    return;
-  }
-  e.respondWith(caches.match(req).then(hit => {
-    const net = fetch(req, { cache: 'no-cache' }).then(res => { if (res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(req, copy)); } return res; }).catch(() => hit);
-    return hit || net;
-  }));
+  e.respondWith(req.mode === 'navigate' ? navigate(req) : asset(req));
 });
 
-// Відкриття сторінки: інтернет чекаємо максимум 3 с, далі збережена копія (а свіжа підтягнеться фоном).
-// Так додаток відкривається і без мережі, і за дуже слабкого зв’язку, коли запит «висить».
-const NAV_WAIT = 3000;
+// Спершу кеш (миттєво й без мережі), а свіжа копія підтягується фоном для наступного запуску.
+function refresh(req, key) {
+  return fetch(req, { cache: 'no-cache' }).then(res => {
+    if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put(key || req, copy)); }
+    return res;
+  });
+}
+function asset(req) {
+  return caches.match(req, { ignoreSearch: true }).then(hit => {
+    if (hit) { refresh(req).catch(() => {}); return hit; }
+    return refresh(req).catch(() => new Response('', { status: 504, statusText: 'offline' }));
+  });
+}
 function offlinePage() {
   return new Response('<!doctype html><html lang="uk"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Немає зв’язку</title>' +
     '<body style="font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;display:grid;place-items:center;min-height:100vh;margin:0;padding:24px;text-align:center">' +
@@ -37,14 +40,8 @@ function offlinePage() {
     { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 function navigate(req) {
-  const cached = () => caches.match('index.html', { ignoreSearch: true }).then(r => r || caches.match('./', { ignoreSearch: true }));
-  const net = fetch(req, { cache: 'no-cache' }).then(res => {
-    if (res && res.ok) { const copy = res.clone(); caches.open(VERSION).then(c => c.put('index.html', copy)); }
-    return res;
-  });
-  const quick = Promise.race([net.catch(() => null), new Promise(r => setTimeout(() => r(null), NAV_WAIT))]);
-  return quick.then(res => {
-    if (res && res.ok) return res;
-    return cached().then(hit => hit || net.then(r => (r && r.ok ? r : offlinePage()), () => offlinePage()));
+  return caches.match('index.html', { ignoreSearch: true }).then(hit => {
+    if (hit) { refresh(req, 'index.html').catch(() => {}); return hit; }
+    return refresh(req, 'index.html').catch(() => offlinePage());
   });
 }

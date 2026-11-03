@@ -102,9 +102,11 @@
   }
 
   // ---------- Список ----------
+  function isOffline() { return typeof navigator.onLine === 'boolean' && !navigator.onLine; }
   function syncLine() {
     var S = F.S;
     if (ui.busy) return '<span class="pulse"></span>Оновлюю список…';
+    if (isOffline()) return '<span class="warn">' + ic('alert', 'sm') + 'Без інтернету. Показую збережене' + (S.lastSync ? ' (' + esc(ago(S.lastSync)) + ')' : '') + '</span>';
     if (ui.syncErr) return '<span class="warn">' + ic('alert', 'sm') + esc(ui.syncErr) + '</span>';
     return 'Оновлено ' + esc(ago(S.lastSync));
   }
@@ -366,12 +368,13 @@
   // ---------- Дії ----------
   function doSync(silent) {
     if (!F.S.url || ui.busy) return Promise.resolve();
+    if (isOffline()) { if (!silent) toast('Немає інтернету. Показую збережені тендери.'); refreshHead(); return Promise.resolve(); }
     ui.busy = true; ui.syncErr = ''; refreshHead();
     return F.sync().then(function (r) {
       ui.busy = false;
       if (!silent || r.added) toast(r.added ? 'Нових тендерів: ' + r.added : r.updated ? 'Оновлено тендерів: ' + r.updated : 'Нових тендерів немає');
       render(); if (ui.sheet) renderSheet();
-    }, function (e) { ui.busy = false; ui.syncErr = F.errText(e); render(); });
+    }, function (e) { ui.busy = false; ui.syncErr = (silent && e && e.code === 'NETWORK') ? '' : F.errText(e); render(); });
   }
   function refreshHead() {
     var s = document.getElementById('syncline'); if (s) s.innerHTML = syncLine();
@@ -484,6 +487,15 @@
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && ui.sheet) { ui.sheet = null; renderSheet(); } });
   window.addEventListener('popstate', function () { if (ui.sheet) { ui.sheet = null; renderSheet(); } });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (F.S.lastSync || 0) > 5 * 60e3) doSync(true); });
+  window.addEventListener('online', function () { toast('Інтернет з’явився'); doSync(true); });
+  window.addEventListener('offline', function () { refreshHead(); toast('Немає інтернету. Додаток працює зі збережених даних.'); });
+  // Посилання на ProZorro потребують мережі: без неї пояснюємо замість порожньої сторінки
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest && ev.target.closest('a[href^="http"]');
+    if (a && isOffline()) { ev.preventDefault(); toast('Немає інтернету, сайт ProZorro не відкриється.'); }
+  }, true);
+  // Просимо браузер не чистити збережені тендери, коли бракує місця
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) { /* ignore */ }
   setInterval(function () { if (document.visibilityState === 'visible') doSync(true); }, 10 * 60e3);
 
   F.init().then(function () {
