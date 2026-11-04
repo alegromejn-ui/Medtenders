@@ -79,6 +79,25 @@
   }
 
   // ---------- Каркас ----------
+  // Під час набору в пошуку лишаємо те саме поле на місці (інакше телефон скидає клавіатуру з цифр на літери після кожного символу)
+  function keepSearchBar(h) {
+    var liveBar = app.querySelector('.searchbar'), inp = liveBar && liveBar.querySelector('input');
+    if (!inp || document.activeElement !== inp) return false;
+    var tmp = document.createElement('div'); tmp.innerHTML = h;
+    var newBar = tmp.querySelector('.searchbar'); if (!newBar) return false;
+    var a = liveBar, b = newBar;
+    while (a !== app) {
+      var pa = a.parentNode, pb = b.parentNode;
+      while (a.previousSibling) pa.removeChild(a.previousSibling);
+      while (a.nextSibling) pa.removeChild(a.nextSibling);
+      var bs = Array.prototype.slice.call(pb.childNodes), idx = bs.indexOf(b);
+      bs.slice(0, idx).forEach(function (n) { pa.insertBefore(n, a); });
+      bs.slice(idx + 1).forEach(function (n) { pa.appendChild(n); });
+      a = pa; b = pb;
+    }
+    return true;
+  }
+
   function render() {
     var h = '', onb = onboarding();
     if (onb) h = onboardPage();
@@ -87,7 +106,7 @@
     else h = listPage(ui.tab === 'star');
     // Колонка фільтрів зліва (на широкому екрані) малюється заново разом зі списком: не даємо їй стрибати вгору
     var side = app.querySelector('.side'), sideTop = side ? side.scrollTop : 0;
-    app.innerHTML = h;
+    if (!(ui.keepSearch && keepSearchBar(h))) app.innerHTML = h;
     app.className = onb || ui.tab === 'settings' ? 'is-settings' : 'is-list';
     tabsEl.style.display = onb ? 'none' : '';
     if (sideTop) { var side2 = app.querySelector('.side'); if (side2) side2.scrollTop = sideTop; }
@@ -457,8 +476,9 @@
     clearTimeout(qT);
     qT = setTimeout(function () {
       F.setF({ q: el.value }); ui.shown = STEP;
-      var pos = el.selectionStart; render();
-      var q = document.getElementById('q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } }
+      var pos = el.selectionStart; ui.keepSearch = true;
+      try { render(); } finally { ui.keepSearch = false; }
+      var q = document.getElementById('q'); if (q && document.activeElement !== q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (e) { /* ignore */ } }
     }, 250);
   });
   document.addEventListener('submit', function (ev) {
